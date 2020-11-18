@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
-	"strings"
 
 	"tt/internal/tt"
 )
@@ -48,7 +48,12 @@ func run(args []string, out io.Writer) error {
 		return tt.ErrInvalidInput("no task or command provided")
 	}
 
-	tt, err := tt.New()
+	path, err := getDBPath()
+	if err != nil {
+		return err
+	}
+
+	tt, err := tt.New(path)
 	if err != nil {
 		return err
 	}
@@ -63,21 +68,13 @@ func run(args []string, out io.Writer) error {
 
 var ErrNotImplemented = errors.New("not implemented")
 
-func dispatch(tt tt.TT, args []string, out io.Writer) (err error) {
-	switch args[0] {
-	case "stop":
-		return ErrNotImplemented
-	case "amend":
-		return ErrNotImplemented
-	case "help":
-		return ErrNotImplemented
-	case "start":
-		args = args[1:]
-		fallthrough
-	default:
-		_, err = tt.Start(strings.Join(args, " "))
-		return ErrNotImplemented
+var errConfigDir = errors.New("unable to fetch config dir")
+
+func getDBPath() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", errConfigDir
 	}
 
-	return err
+	return filepath.Join(dir, "the-terse-time-tracker.db"), nil
 }

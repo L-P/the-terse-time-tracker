@@ -3,7 +3,7 @@ linters:
   enable-all: true
   disable:
     # Zero values are an excellent feature, this linter is moronic.
-    - exhaustivestructs
+    - exhaustivestruct
 
     # Unacceptable styling or incompatibilities with gofmt
     - gci
