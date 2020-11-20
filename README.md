@@ -20,15 +20,11 @@ $ tt amend writing documentation
 # Until now the tasks had no tags, let's categorize them:
 $ tt foobaring @acme-corp @billable
 
-# It is assumed you want to keep the previous tags when switching tasks over:
+# It is assumed you want to keep the previous tags when switching tasks:
 $ tt bazzing
 
-# If you want to remove a tag, amend with a new tag list that will override the
-previous one:
-$ tt amend @acme-corp
-
-# Since we're editing the current running task, would could as well reuse the
-previous command without having a new task created:
+# If you want to remove a tag, amend with a new tag list that will overwrite
+# the previous one:
 $ tt bazzing @acme-corp
 
 

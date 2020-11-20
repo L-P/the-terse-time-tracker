@@ -20,7 +20,7 @@ var Version = "unknown"
 func main() {
 	out := flag.CommandLine.Output()
 	flag.Usage = func() {
-		fmt.Fprint(out, "Please run `tt help` to obtain the documentation.\n")
+		fmt.Fprint(out, "Please run `man tt` to obtain the documentation.\n")
 		os.Exit(0)
 	}
 

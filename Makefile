@@ -2,7 +2,14 @@ VERSION=$(shell git describe --tags)
 BUILDFLAGS=-ldflags '-X main.Version=${VERSION}'
 EXEC=tt
 
-all: $(EXEC) tags
+all: $(EXEC) tt.man
+
+tt.man: man.md
+	VERSION="$(VERSION)" \
+	DATE="$(shell date '+%B %d, %Y')" \
+			envsubst '$$VERSION:$$DATE' < "$<" > "man.subst.md"
+	pandoc -s -t man "man.subst.md" -o "$@"
+	rm "man.subst.md"
 
 $(EXEC):
 	go build ${BUILDFLAGS} tt/cmd/tt

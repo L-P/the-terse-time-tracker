@@ -13,10 +13,6 @@ func dispatch(app *tt.TT, args []string, out io.Writer) error {
 	switch args[0] {
 	case "stop":
 		return stop(app, out)
-	case "amend":
-		return ErrNotImplemented
-	case "help":
-		return ErrNotImplemented
 	case "start":
 		args = args[1:]
 		fallthrough
