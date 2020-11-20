@@ -53,7 +53,7 @@ func run(args []string, out io.Writer) error {
 		return err
 	}
 
-	tt, err := tt.New(path)
+	tt, err := tt.New(fmt.Sprintf(`file:%s?mode=rwc`, path))
 	if err != nil {
 		return err
 	}

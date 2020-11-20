@@ -20,4 +20,7 @@ lint:
 tags:
 	ctags-universal -R internal cmd
 
-.PHONY: $(EXEC) lint tags
+test:
+	go test ./...
+
+.PHONY: $(EXEC) lint tags test

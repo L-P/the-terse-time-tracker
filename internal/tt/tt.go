@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3" // SQL driver
 )
@@ -14,8 +15,7 @@ type TT struct {
 	db *sql.DB
 }
 
-func New(dbPath string) (*TT, error) {
-	dsn := "file:" + dbPath + "?mode=rwc"
+func New(dsn string) (*TT, error) {
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, ErrIO{"unable to open database", dsn, err}
@@ -79,6 +79,7 @@ func (tt *TT) Start(raw string) (*Task, *Task, error) {
 	return created, cur, nil
 }
 
+// Stop stops the current task if any.
 func (tt *TT) Stop() (*Task, error) {
 	var cur *Task
 
@@ -92,6 +93,7 @@ func (tt *TT) Stop() (*Task, error) {
 			return ErrNoCurrentTask
 		}
 
+		cur.StoppedAt = time.Now()
 		if err := stopCurrentTask(tx); err != nil {
 			return err
 		}
