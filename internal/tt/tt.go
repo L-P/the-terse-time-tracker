@@ -36,7 +36,7 @@ func (tt *TT) Close() error {
 // or do nothing.
 // It returns the created task if any, and the updated (current) task if any.
 func (tt *TT) Start(raw string) (*Task, *Task, error) {
-	desc, tags := parseRawDesc(raw)
+	desc, tags := ParseRawDesc(raw)
 	var cur, created *Task
 
 	if err := tt.transaction(func(tx *sql.Tx) (err error) {
@@ -107,9 +107,9 @@ func (tt *TT) Stop() (*Task, error) {
 	return cur, nil
 }
 
-// parseRawDesc splits the description and tags from user input.
+// ParseRawDesc splits the description and tags from user input.
 // tags can only be provided at the end of the string.
-func parseRawDesc(raw string) (string, []string) {
+func ParseRawDesc(raw string) (string, []string) {
 	reverse := func(v []string) {
 		for i, j := 0, len(v)-1; i < j; i, j = i+1, j-1 {
 			v[i], v[j] = v[j], v[i]
@@ -171,11 +171,12 @@ func doInitialMigration(db *sql.DB) error {
         );`,
 
 		`CREATE TABLE "Task" (
+            "ID" integer NOT NULL,
             "Description" text NOT NULL,
             "StartedAt" integer NOT NULL,
             "StoppedAt" integer NULL,
             "Tags" text COLLATE 'BINARY' NOT NULL,
-            PRIMARY KEY ("StartedAt")
+            PRIMARY KEY ("ID")
         );`,
 
 		`INSERT INTO "Config" ("Key", "Value") VALUES (
@@ -219,4 +220,14 @@ func (tt *TT) Tasks() ([]Task, error) {
 	}
 
 	return ret, nil
+}
+
+func (tt *TT) Delete(taskID int64) error {
+	return tt.transaction(func(tx *sql.Tx) error {
+		return deleteTask(tx, taskID)
+	})
+}
+
+func (tt *TT) Update(t Task) error {
+	return tt.transaction(t.update)
 }

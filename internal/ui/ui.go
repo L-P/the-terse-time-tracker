@@ -1,8 +1,9 @@
 package ui
 
 import (
-	"log"
+	"fmt"
 	"strings"
+	"time"
 	"tt/internal/tt"
 
 	"github.com/gdamore/tcell/v2"
@@ -10,8 +11,9 @@ import (
 )
 
 const (
-	maxDescLen = 40
-	maxTagsLen = 40
+	maxDescLen     = 40
+	maxTagsLen     = 40
+	dateTimeFormat = "2006-02-01 15:04"
 )
 
 type UI struct {
@@ -21,6 +23,9 @@ type UI struct {
 	flex  *tview.Flex
 	table *tview.Table
 	form  *tview.Form
+
+	tasks             []tt.Task
+	selectedTaskIndex int // index in tasks slice
 }
 
 func New(tt *tt.TT) *UI {
@@ -39,25 +44,28 @@ func New(tt *tt.TT) *UI {
 func (ui *UI) init() {
 	ui.initLayout()
 	ui.initTable()
+	ui.updateForm(ui.selectedTask())
 
 	ui.flex.SetInputCapture(ui.inputCapture)
 }
 
 func (ui *UI) inputCapture(event *tcell.EventKey) *tcell.EventKey {
-	switch {
-	case event.Rune() == 'q', event.Key() == tcell.KeyEscape:
+	if event.Key() == tcell.KeyEscape {
+		if ui.form.HasFocus() {
+			ui.app.SetFocus(ui.table)
+			return nil
+		}
+
 		ui.app.Stop()
 		return nil
-	case event.Rune() == ' ':
-		if ui.table.HasFocus() {
-			ui.app.SetFocus(ui.form)
-		} else {
-			ui.app.SetFocus(ui.table)
-		}
-		return nil
-	default:
-		return event
 	}
+
+	return event
+}
+
+func (ui *UI) printError(msg string, args ...interface{}) {
+	// TODO proper error display
+	fmt.Print("\x1b[0m" + fmt.Sprintf(msg, args...))
 }
 
 func (ui *UI) initTable() {
@@ -66,14 +74,148 @@ func (ui *UI) initTable() {
 
 	tasks, err := ui.tt.Tasks()
 	if err != nil {
-		log.Printf("error: unable to read tasks: %s", err)
-		return
+		ui.printError("error: unable to read tasks: %s", err)
+		tasks = nil
 	}
+
+	ui.table.SetSelectionChangedFunc(func(row, col int) {
+		if row < 1 { // row 0 is the table labels
+			return
+		}
+
+		ui.selectedTaskIndex = row - 1
+		ui.updateForm(ui.selectedTask())
+	})
+
+	ui.table.SetSelectedFunc(func(row, col int) {
+		ui.app.SetFocus(ui.form)
+	})
 
 	ui.updateTasks(tasks)
 }
 
+const ( // must match the AddInputField order below
+	formFieldIndexDescription = iota
+	formFieldIndexStartedAt
+	formFieldIndexStoppedAt
+	formFieldIndexTags
+)
+
+func (ui *UI) updateForm(task tt.Task) {
+	ui.form.Clear(true)
+	ui.form.
+		AddInputField(t("Description"), task.Description, 0, nil, nil).
+		AddInputField(t("Started at"), formDate(task.StartedAt), 16, nil, nil).
+		AddInputField(t("Stopped at"), formDate(task.StoppedAt), 16, nil, nil).
+		AddInputField(t("Tags"), strings.Join(task.Tags, " "), 0, nil, nil).
+		AddButton(t("Save"), ui.saveFormTask).
+		AddButton(t("Delete"), ui.deleteFormTask)
+}
+
+func (ui *UI) saveFormTask() {
+	ui.app.SetFocus(ui.table)
+	if len(ui.tasks) == 0 {
+		return
+	}
+
+	task, err := ui.formTask()
+	if err != nil {
+		ui.printError("error: invalid task:  %s", err) // TODO proper error display
+		return
+	}
+
+	if err := ui.tt.Update(task); err != nil {
+		ui.printError("error: can't update: %s", err) // TODO proper error display
+		return
+	}
+
+	ui.tasks[ui.selectedTaskIndex] = task
+	ui.updateTasks(ui.tasks)
+}
+
+func (ui *UI) selectedTask() tt.Task {
+	if len(ui.tasks) == 0 {
+		return tt.Task{}
+	}
+
+	return ui.tasks[ui.selectedTaskIndex]
+}
+
+func (ui *UI) deleteFormTask() {
+	ui.app.SetFocus(ui.table)
+	if len(ui.tasks) == 0 {
+		return
+	}
+
+	if err := ui.tt.Delete(ui.selectedTask().ID); err != nil {
+		ui.printError("error: can't delete: %s", err) // TODO proper error display
+		return
+	}
+
+	ui.tasks = append(ui.tasks[:ui.selectedTaskIndex], ui.tasks[ui.selectedTaskIndex+1:]...)
+	ui.selectedTaskIndex = clamp(ui.selectedTaskIndex-1, 0, len(ui.tasks)-1)
+
+	ui.updateForm(ui.selectedTask())
+	ui.updateTasks(ui.tasks)
+}
+
+func clamp(v, min, max int) int {
+	if v < min {
+		return min
+	}
+
+	if v > max {
+		return max
+	}
+
+	return v
+}
+
+func (ui *UI) formTask() (tt.Task, error) {
+	// Indices are from the input order in the form definition in updateForm.
+	value := func(i int) string {
+		return ui.form.GetFormItem(i).(*tview.InputField).GetText()
+	}
+
+	_, tags := tt.ParseRawDesc(value(formFieldIndexTags))
+
+	location := time.Now().Location()
+	startedAt, err := time.ParseInLocation(dateTimeFormat, value(formFieldIndexStartedAt), location)
+	if err != nil {
+		return tt.Task{}, tt.ErrInvalidInput(err.Error())
+	}
+
+	var stoppedAt time.Time
+	if str := value(formFieldIndexStoppedAt); str != "" {
+		stoppedAt, err = time.ParseInLocation(dateTimeFormat, str, location)
+		if err != nil {
+			return tt.Task{}, tt.ErrInvalidInput(err.Error())
+		}
+	}
+
+	if !stoppedAt.IsZero() && startedAt.After(stoppedAt) {
+		startedAt, stoppedAt = stoppedAt, startedAt
+	}
+
+	return tt.Task{
+		ID:          ui.selectedTask().ID,
+		Description: value(formFieldIndexDescription),
+		StartedAt:   startedAt,
+		StoppedAt:   stoppedAt,
+		Tags:        tags,
+	}, nil
+}
+
+func formDate(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+
+	return t.Format(dateTimeFormat)
+}
+
 func (ui *UI) updateTasks(tasks []tt.Task) {
+	ui.tasks = tasks
 	for i, v := range []string{
 		t("Description"), t("Started at"), t("Stopped at"), t("Tags"),
 	} {
@@ -86,10 +228,10 @@ func (ui *UI) updateTasks(tasks []tt.Task) {
 	rowID := 1
 
 	for _, v := range tasks {
-		startedAt := v.StoppedAt.Format("15:04")
+		startedAt := v.StartedAt.Format("15:04")
 		curLineDay := v.StartedAt.Format("2006-01-02")
 		if lastLineDay != curLineDay {
-			startedAt = v.StartedAt.Format("2006-01-02 15:04")
+			startedAt = v.StartedAt.Format(dateTimeFormat)
 			lastLineDay = curLineDay
 		}
 
@@ -115,8 +257,8 @@ func clampString(v string, max int) string {
 }
 
 func (ui *UI) initLayout() {
-	ui.table.SetBorder(true)
-	ui.form.SetBorder(true)
+	ui.table.SetBorder(true).SetTitle(t("Past tasks"))
+	ui.form.SetBorder(true).SetTitle(t("Selected task"))
 
 	ui.flex = tview.NewFlex().
 		AddItem(ui.table, 0, 2, true).

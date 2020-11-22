@@ -42,6 +42,15 @@ func exec(tx *sql.Tx, query string, params ...interface{}) error {
 	return nil
 }
 
+func execWithLastID(tx *sql.Tx, query string, params ...interface{}) (int64, error) {
+	res, err := tx.Exec(query, params...)
+	if err != nil {
+		return -1, ErrBadQuery{err, query, params}
+	}
+
+	return res.LastInsertId()
+}
+
 func debugPrintQuery(query string, params ...interface{}) { // nolint:deadcode,unused
 	for _, v := range params {
 		var str string

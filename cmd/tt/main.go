@@ -20,11 +20,11 @@ var Version = "unknown"
 func main() {
 	out := flag.CommandLine.Output()
 	flag.Usage = func() {
-		fmt.Fprint(out, "Please run `man tt` to obtain the documentation.\n")
+		fmt.Fprint(out, t("Please run `man tt` to obtain the documentation.\n"))
 		os.Exit(0)
 	}
 
-	v := flag.Bool("v", false, "displays tt version and exits")
+	v := flag.Bool("v", false, t("displays tt version and exits"))
 	flag.Parse()
 	if *v {
 		fmt.Fprintf(out, "tt version %s %s/%s\n", Version, runtime.GOOS, runtime.GOARCH)
@@ -45,7 +45,7 @@ func main() {
 
 func run(args []string, out io.Writer) error {
 	if len(args) == 0 {
-		return tt.ErrInvalidInput("no task or command provided")
+		return tt.ErrInvalidInput(t("no task or command provided"))
 	}
 
 	path, err := getDBPath()
@@ -66,7 +66,7 @@ func run(args []string, out io.Writer) error {
 	return dispatch(tt, args, out)
 }
 
-var errConfigDir = errors.New("unable to fetch config dir")
+var errConfigDir = errors.New(t("unable to fetch config dir"))
 
 func getDBPath() (string, error) {
 	dir, err := os.UserConfigDir()

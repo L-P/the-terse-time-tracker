@@ -1,5 +1,5 @@
 % TT(1) tt $VERSION
-% Léo Peltier
+% Written by Léo Peltier
 % $DATE
 
 # NAME
@@ -16,8 +16,15 @@ If no recognized *command* is specified **start** is implied.
 
 start
 :   Either creates a new task and stops the current one, or edits the current
-    tasks tags. If no tags are given and there is a task running, the new tasks
-    will reuse the running task tags.
+    task tags. If no tags are given and there is a different task running, the
+    new task will reuse the running task tags.
 
 stop
 :   Stops the current task timer.
+
+ui
+:   Starts the TUI that allow editing past entries.
+
+# DATA
+The Terse Time Tracker stores all of its data in a SQLite database named
+`the-terse-time-tracker.db` in your default user configuration directory.

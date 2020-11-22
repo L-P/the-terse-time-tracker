@@ -10,6 +10,7 @@ import (
 )
 
 type Task struct {
+	ID          int64
 	Description string
 	Tags        []string
 	StartedAt   time.Time
@@ -18,6 +19,7 @@ type Task struct {
 
 // taskProxy is the Task as stored in DB.
 type taskProxy struct {
+	ID          int64
 	Description string
 	Tags        []byte
 	StartedAt   util.TimeAsTimestamp
@@ -26,7 +28,7 @@ type taskProxy struct {
 
 func taskProxyFields() string {
 	// Order must match fields in taskProxy.Scan
-	return `"Description", "StartedAt", "StoppedAt", "Tags"`
+	return `"ID", "Description", "StartedAt", "StoppedAt", "Tags"`
 }
 
 type scannable interface {
@@ -35,6 +37,7 @@ type scannable interface {
 
 func (t *taskProxy) scan(s scannable) error {
 	return s.Scan(
+		&t.ID,
 		&t.Description,
 		&t.StartedAt,
 		&t.StoppedAt,
@@ -53,6 +56,7 @@ func newProxyFromTask(t Task) (taskProxy, error) {
 	}
 
 	return taskProxy{
+		ID:          t.ID,
 		Description: t.Description,
 		StartedAt:   util.TimeAsTimestamp(t.StartedAt),
 		StoppedAt:   util.NewNullTimeAsTimestamp(t.StoppedAt),
@@ -62,6 +66,7 @@ func newProxyFromTask(t Task) (taskProxy, error) {
 
 func (t taskProxy) Task() (*Task, error) {
 	ret := Task{
+		ID:          t.ID,
 		Description: t.Description,
 		StartedAt:   t.StartedAt.Time(),
 		StoppedAt:   t.StoppedAt.Time.Time(),
@@ -83,6 +88,10 @@ func NewTask(desc string, tags []string) *Task {
 }
 
 func (t *Task) update(tx *sql.Tx) error {
+	if t.ID == 0 {
+		return ErrInvalidTaskID
+	}
+
 	proxy, err := newProxyFromTask(*t)
 	if err != nil {
 		return err
@@ -95,12 +104,12 @@ func (t *Task) update(tx *sql.Tx) error {
             StartedAt = ?,
             StoppedAt = ?,
             Tags = ?
-        WHERE StartedAt = ?`,
+        WHERE ID = ?`,
 		proxy.Description,
 		proxy.StartedAt,
 		proxy.StoppedAt,
 		proxy.Tags,
-		proxy.StartedAt,
+		t.ID,
 	)
 }
 
@@ -110,7 +119,7 @@ func (t *Task) insert(tx *sql.Tx) error {
 		return err
 	}
 
-	return exec(
+	t.ID, err = execWithLastID(
 		tx,
 		`INSERT INTO Task (Description, StartedAt, StoppedAt, Tags)
         VALUES (?, ?, ?, ?)`,
@@ -119,6 +128,8 @@ func (t *Task) insert(tx *sql.Tx) error {
 		proxy.StoppedAt,
 		proxy.Tags,
 	)
+
+	return err
 }
 
 func (t *Task) Duration() time.Duration {
@@ -191,4 +202,12 @@ func stopCurrentTask(tx *sql.Tx) error {
 		`UPDATE Task SET StoppedAt = ? WHERE StoppedAt IS NULL`,
 		util.NewNullTimeAsTimestamp(time.Now()),
 	)
+}
+
+func deleteTask(tx *sql.Tx, id int64) error {
+	if id == 0 {
+		return ErrInvalidTaskID
+	}
+
+	return exec(tx, `DELETE FROM Task WHERE ID = ?`, id)
 }
