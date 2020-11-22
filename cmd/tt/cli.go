@@ -6,11 +6,16 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 	"tt/internal/tt"
+	"tt/internal/ui"
 )
 
 func dispatch(app *tt.TT, args []string, out io.Writer) error {
 	switch args[0] {
+	case "ui":
+		ui := ui.New(app)
+		return ui.Run()
 	case "stop":
 		return stop(app, out)
 	case "start":

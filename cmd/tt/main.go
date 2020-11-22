@@ -66,8 +66,6 @@ func run(args []string, out io.Writer) error {
 	return dispatch(tt, args, out)
 }
 
-var ErrNotImplemented = errors.New("not implemented")
-
 var errConfigDir = errors.New("unable to fetch config dir")
 
 func getDBPath() (string, error) {

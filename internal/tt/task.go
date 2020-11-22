@@ -24,13 +24,17 @@ type taskProxy struct {
 	StoppedAt   util.NullTimeAsTimestamp
 }
 
-func (t taskProxy) fields() string {
-	// Order must match fields in scan
+func taskProxyFields() string {
+	// Order must match fields in taskProxy.Scan
 	return `"Description", "StartedAt", "StoppedAt", "Tags"`
 }
 
-func (t *taskProxy) scan(row *sql.Row) error {
-	return row.Scan(
+type scannable interface {
+	Scan(...interface{}) error
+}
+
+func (t *taskProxy) scan(s scannable) error {
+	return s.Scan(
 		&t.Description,
 		&t.StartedAt,
 		&t.StoppedAt,
@@ -125,12 +129,50 @@ func (t *Task) Duration() time.Duration {
 	return t.StoppedAt.Sub(t.StartedAt)
 }
 
+func getAllTasks(tx *sql.Tx) ([]Task, error) {
+	var ret []Task
+
+	query := fmt.Sprintf( // nolint:gosec
+		`SELECT %s FROM Task ORDER BY StartedAt DESC`,
+		taskProxyFields(),
+	)
+	rows, err := tx.Query(query)
+	if err := err; err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, ErrBadQuery{err, query, nil}
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var proxy taskProxy
+		if err := proxy.scan(rows); err != nil {
+			return nil, ErrBadQuery{err, query, nil}
+		}
+
+		task, err := proxy.Task()
+		if err != nil {
+			return nil, err
+		}
+
+		ret = append(ret, *task)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, ErrBadQuery{err, query, nil}
+	}
+
+	return ret, nil
+}
+
 func getCurrentTask(tx *sql.Tx) (*Task, error) {
 	var proxy taskProxy
 
 	query := fmt.Sprintf(
 		`SELECT %s FROM Task WHERE StoppedAt IS NULL LIMIT 1`,
-		proxy.fields(),
+		taskProxyFields(),
 	)
 	if err := proxy.scan(tx.QueryRow(query)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

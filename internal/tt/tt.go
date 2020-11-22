@@ -63,9 +63,10 @@ func (tt *TT) Start(raw string) (*Task, *Task, error) {
 			return err
 		}
 
-		if tags == nil && cur != nil {
+		if len(tags) == 0 && cur != nil {
 			tags = cur.Tags
 		}
+
 		created = NewTask(desc, tags)
 		if err := created.insert(tx); err != nil {
 			return err
@@ -110,7 +111,9 @@ func (tt *TT) Stop() (*Task, error) {
 // tags can only be provided at the end of the string.
 func parseRawDesc(raw string) (string, []string) {
 	reverse := func(v []string) {
-		sort.Slice(v, func(i, j int) bool { return true })
+		for i, j := 0, len(v)-1; i < j; i, j = i+1, j-1 {
+			v[i], v[j] = v[j], v[i]
+		}
 	}
 
 	var (
@@ -199,4 +202,21 @@ func getVersion(db *sql.DB) int {
 	}
 
 	return version
+}
+
+func (tt *TT) Tasks() ([]Task, error) {
+	var ret []Task
+
+	if err := tt.transaction(func(tx *sql.Tx) (err error) {
+		ret, err = getAllTasks(tx)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
 }
