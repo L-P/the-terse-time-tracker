@@ -58,7 +58,7 @@ func writeStoppedTaskMessage(out io.Writer, task tt.Task) {
 	fmt.Fprintf(
 		out,
 		t("Stopped task that had been running for %s: \"%s\"\n"),
-		task.Duration(),
+		task.Duration().Round(time.Second),
 		task.Description,
 	)
 }
