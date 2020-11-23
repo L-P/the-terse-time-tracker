@@ -23,4 +23,14 @@ tags:
 test:
 	go test ./...
 
-.PHONY: $(EXEC) lint tags test
+vendor:
+	go get -v
+	go mod vendor
+	go mod tidy
+
+upgrade:
+	go get -u -v
+	go mod vendor
+	go mod tidy
+
+.PHONY: $(EXEC) lint tags test vendor upgrade
