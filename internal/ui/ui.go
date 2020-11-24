@@ -13,8 +13,8 @@ import (
 const (
 	maxDescLen     = 40
 	maxTagsLen     = 40
-	dateFormat     = "2006-02-01"
-	dateTimeFormat = "2006-02-01 15:04:05"
+	dateFormat     = "2006-01-02"
+	dateTimeFormat = "2006-01-02 15:04:05"
 	timeFormat     = "15:04:05"
 )
 

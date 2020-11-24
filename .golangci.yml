@@ -5,6 +5,7 @@ linters:
     # Moronic linters
     - exhaustivestruct  # Zero values are an excellent feature.
     - godox  # No, a TODO is not an error.
+    - gomnd
 
     # Unacceptable styling or incompatibilities with gofmt
     - gci

@@ -21,17 +21,18 @@ func dispatch(app *tt.TT, args []string, out io.Writer) error {
 		os.Exit(0)
 	}
 
-	v := fset.Bool("v", false, t("displays tt version and exits"))
+	showVersion := fset.Bool("v", false, t("displays tt version and exits"))
 	showUI := fset.Bool("ui", false, t("displays the TUI"))
 	startTask := fset.Bool("start", false, t("starts a new task or updates the current one"))
 	stopTask := fset.Bool("s", false, t("stops the current task"))
+	loadFixtures := fset.Bool("fixture", false, t("clears the database and fills it with dev data"))
 
 	if err := fset.Parse(args); err != nil {
 		return err
 	}
 
 	switch {
-	case *v:
+	case *showVersion:
 		fmt.Fprintf(out, "tt version %s %s/%s\n", Version, runtime.GOOS, runtime.GOARCH)
 		return nil
 	case *showUI:
@@ -39,6 +40,8 @@ func dispatch(app *tt.TT, args []string, out io.Writer) error {
 		return ui.Run()
 	case *stopTask:
 		return stop(app, out)
+	case *loadFixtures:
+		return app.Fixture()
 	case *startTask:
 		fallthrough
 	default:
