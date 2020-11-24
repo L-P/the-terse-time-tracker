@@ -13,7 +13,9 @@ import (
 const (
 	maxDescLen     = 40
 	maxTagsLen     = 40
-	dateTimeFormat = "2006-02-01 15:04"
+	dateFormat     = "2006-02-01"
+	dateTimeFormat = "2006-02-01 15:04:05"
+	timeFormat     = "15:04:05"
 )
 
 type UI struct {
@@ -228,8 +230,8 @@ func (ui *UI) updateTasks(tasks []tt.Task) {
 	rowID := 1
 
 	for _, v := range tasks {
-		startedAt := v.StartedAt.Format("15:04")
-		curLineDay := v.StartedAt.Format("2006-01-02")
+		startedAt := v.StartedAt.Format(timeFormat)
+		curLineDay := v.StartedAt.Format(dateFormat)
 		if lastLineDay != curLineDay {
 			startedAt = v.StartedAt.Format(dateTimeFormat)
 			lastLineDay = curLineDay
@@ -237,7 +239,7 @@ func (ui *UI) updateTasks(tasks []tt.Task) {
 
 		var stoppedAt string
 		if !v.StoppedAt.IsZero() {
-			stoppedAt = v.StoppedAt.Format("15:04")
+			stoppedAt = v.StoppedAt.Format(timeFormat)
 		}
 
 		ui.table.SetCell(rowID, 0, tview.NewTableCell(clampString(v.Description, maxDescLen)))
