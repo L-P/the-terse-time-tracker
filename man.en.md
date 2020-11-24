@@ -6,24 +6,28 @@
 tt - The Terse Time Tracker
 
 # SYNOPSIS
-tt [*command*] description
+tt [-start] description  
+tt *option*
 
 # DESCRIPTION
 The Terse Time Tracker tracks time spent on tasks and creates reports.
 
-# COMMANDS
-If no recognized *command* is specified **start** is implied.
+# OPTIONS
+If no option is given, *start* is implied.
 
-start
+*-start*
 :   Either creates a new task and stops the current one, or edits the current
     task tags. If no tags are given and there is a different task running, the
     new task will reuse the running task tags.
 
-stop
+*-s*
 :   Stops the current task timer.
 
-ui
+*-ui*
 :   Starts the TUI that allow editing past entries.
+
+*-v*
+:   Displays the version and exits.
 
 # DATA
 The Terse Time Tracker stores all of its data in a SQLite database named

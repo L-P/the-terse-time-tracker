@@ -3,8 +3,11 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io"
+	"os"
+	"runtime"
 	"strings"
 	"time"
 	"tt/internal/tt"
@@ -12,17 +15,34 @@ import (
 )
 
 func dispatch(app *tt.TT, args []string, out io.Writer) error {
-	switch args[0] {
-	case "ui":
+	fset := flag.NewFlagSet("main", flag.ExitOnError)
+	fset.Usage = func() {
+		fmt.Fprint(out, t("Please run `man tt` to obtain the documentation.\n"))
+		os.Exit(0)
+	}
+
+	v := fset.Bool("v", false, t("displays tt version and exits"))
+	showUI := fset.Bool("ui", false, t("displays the TUI"))
+	startTask := fset.Bool("start", false, t("starts a new task or updates the current one"))
+	stopTask := fset.Bool("s", false, t("stops the current task"))
+
+	if err := fset.Parse(args); err != nil {
+		return err
+	}
+
+	switch {
+	case *v:
+		fmt.Fprintf(out, "tt version %s %s/%s\n", Version, runtime.GOOS, runtime.GOARCH)
+		return nil
+	case *showUI:
 		ui := ui.New(app)
 		return ui.Run()
-	case "stop":
+	case *stopTask:
 		return stop(app, out)
-	case "start":
-		args = args[1:]
+	case *startTask:
 		fallthrough
 	default:
-		return start(app, args, out)
+		return start(app, fset.Args(), out)
 	}
 }
 
