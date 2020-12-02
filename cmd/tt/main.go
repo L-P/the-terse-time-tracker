@@ -30,10 +30,6 @@ func main() {
 }
 
 func run(args []string, out io.Writer) error {
-	if len(args) == 0 {
-		return tt.ErrInvalidInput(t("no task or command provided"))
-	}
-
 	path, err := getDBPath()
 	if err != nil {
 		return err

@@ -45,8 +45,27 @@ func dispatch(app *tt.TT, args []string, out io.Writer) error {
 	case *startTask:
 		fallthrough
 	default:
+		if len(fset.Args()) == 0 {
+			return showCurrent(app, out)
+		}
 		return start(app, fset.Args(), out)
 	}
+}
+
+func showCurrent(app *tt.TT, out io.Writer) error {
+	cur, err := app.CurrentTask()
+	if err != nil {
+		return err
+	}
+
+	if cur == nil {
+		fmt.Fprint(out, t("There is no task running.\n"))
+		return nil
+	}
+
+	fmt.Fprintf(out, t("Current task: %s %s\n"), cur.Description, strings.Join(cur.Tags, " "))
+
+	return nil
 }
 
 func start(app *tt.TT, args []string, out io.Writer) error {

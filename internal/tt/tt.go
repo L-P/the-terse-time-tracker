@@ -231,3 +231,20 @@ func (tt *TT) Delete(taskID int64) error {
 func (tt *TT) Update(t Task) error {
 	return tt.transaction(t.update)
 }
+
+func (tt *TT) CurrentTask() (*Task, error) {
+	var cur *Task
+
+	if err := tt.transaction(func(tx *sql.Tx) (err error) {
+		cur, err = getCurrentTask(tx)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return cur, nil
+}
