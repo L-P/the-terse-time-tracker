@@ -20,7 +20,7 @@ If no option is given, *start* is implied.
     task tags. If no tags are given and there is a different task running, the
     new task will reuse the running task tags.
 
-*-s*
+*-stop*
 :   Stops the current task timer.
 
 *-ui*

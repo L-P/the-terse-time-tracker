@@ -12,12 +12,9 @@ $ tt start working on tt
 $ tt writing documentatin
 
 # Done with the work, stop the task:
-$ tt stop
+$ tt -stop
 
-# There was a typo in the last task, let's edit it:
-$ tt amend writing documentation
-
-# Until now the tasks had no tags, let's categorize them:
+# The last task had no tags, let's add some:
 $ tt foobaring @acme-corp @billable
 
 # It is assumed you want to keep the previous tags when switching tasks:
@@ -27,7 +24,6 @@ $ tt bazzing
 # the previous one:
 $ tt bazzing @acme-corp
 
-
 # We're done for now.
-$ tt stop
+$ tt -stop
 ```

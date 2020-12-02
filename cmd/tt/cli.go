@@ -24,7 +24,7 @@ func dispatch(app *tt.TT, args []string, out io.Writer) error {
 	showVersion := fset.Bool("v", false, t("displays tt version and exits"))
 	showUI := fset.Bool("ui", false, t("displays the TUI"))
 	startTask := fset.Bool("start", false, t("starts a new task or updates the current one"))
-	stopTask := fset.Bool("s", false, t("stops the current task"))
+	stopTask := fset.Bool("stop", false, t("stops the current task"))
 	loadFixtures := fset.Bool("fixture", false, t("clears the database and fills it with dev data"))
 
 	if err := fset.Parse(args); err != nil {
