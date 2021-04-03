@@ -12,6 +12,7 @@ import (
 	"time"
 	"tt/internal/tt"
 	"tt/internal/ui"
+	"tt/internal/util"
 )
 
 func dispatch(app *tt.TT, args []string, out io.Writer) error {
@@ -63,7 +64,13 @@ func showCurrent(app *tt.TT, out io.Writer) error {
 		return nil
 	}
 
-	fmt.Fprintf(out, t("Current task: %s %s\n"), cur.Description, strings.Join(cur.Tags, " "))
+	fmt.Fprintf(
+		out,
+		t("Current task: %s %s, running for %s\n"),
+		cur.Description,
+		strings.Join(cur.Tags, " "),
+		util.FormatDuration(time.Since(cur.StartedAt)),
+	)
 
 	return nil
 }
