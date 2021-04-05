@@ -71,6 +71,13 @@ func (ui *UI) formInputCapture(event *tcell.EventKey) *tcell.EventKey {
 
 func (ui *UI) tableInputCapture(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() { // nolint:exhaustive
+	case tcell.KeyRune:
+		switch event.Rune() {
+		case 'q':
+			ui.app.Stop()
+		default:
+			return event
+		}
 	case tcell.KeyEscape:
 		ui.app.Stop()
 	case tcell.KeyDelete:
