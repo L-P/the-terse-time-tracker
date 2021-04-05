@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"tt/internal/tt"
 )
@@ -18,23 +17,10 @@ import (
 var Version = "unknown"
 
 func main() {
-	out := flag.CommandLine.Output()
-	flag.Usage = func() {
-		fmt.Fprint(out, "Please run `man tt` to obtain the documentation.\n")
-		os.Exit(0)
-	}
-
-	v := flag.Bool("v", false, "displays tt version and exits")
-	flag.Parse()
-	if *v {
-		fmt.Fprintf(out, "tt version %s %s/%s\n", Version, runtime.GOOS, runtime.GOARCH)
-		os.Exit(0)
-	}
-
-	if err := run(os.Args[1:], out); err != nil {
+	if err := run(os.Args[1:], os.Stderr); err != nil {
 		var e tt.ErrInvalidInput
 		if errors.As(err, &e) {
-			fmt.Fprintf(out, "error: %s\n", err)
+			fmt.Fprintf(os.Stderr, "error: %s\n", err)
 			flag.Usage()
 			os.Exit(1)
 		}
@@ -44,10 +30,6 @@ func main() {
 }
 
 func run(args []string, out io.Writer) error {
-	if len(args) == 0 {
-		return tt.ErrInvalidInput("no task or command provided")
-	}
-
 	path, err := getDBPath()
 	if err != nil {
 		return err
@@ -66,9 +48,7 @@ func run(args []string, out io.Writer) error {
 	return dispatch(tt, args, out)
 }
 
-var ErrNotImplemented = errors.New("not implemented")
-
-var errConfigDir = errors.New("unable to fetch config dir")
+var errConfigDir = errors.New(t("unable to fetch config dir"))
 
 func getDBPath() (string, error) {
 	dir, err := os.UserConfigDir()

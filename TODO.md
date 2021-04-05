@@ -1,0 +1,5 @@
+- Implement tag edit as a list/table
+- Implement modal datetime picker
+- Implement multiline text input
+- Package as a Debian package.
+- Mouse input (eww)

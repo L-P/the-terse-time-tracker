@@ -36,10 +36,10 @@ func (tt *TT) Close() error {
 // or do nothing.
 // It returns the created task if any, and the updated (current) task if any.
 func (tt *TT) Start(raw string) (*Task, *Task, error) {
-	desc, tags := parseRawDesc(raw)
+	desc, tags := ParseRawDesc(raw)
 	var cur, created *Task
 
-	if err := tt.transaction(func(tx *sql.Tx) (err error) {
+	err := tt.transaction(func(tx *sql.Tx) (err error) {
 		cur, err = getCurrentTask(tx)
 		if err != nil {
 			return err
@@ -47,8 +47,7 @@ func (tt *TT) Start(raw string) (*Task, *Task, error) {
 
 		if cur != nil && cur.Description == desc {
 			if reflect.DeepEqual(cur.Tags, tags) {
-				cur = nil
-				return nil
+				return ErrContinue
 			}
 
 			// Tags differ, update current task with new tags.
@@ -63,20 +62,19 @@ func (tt *TT) Start(raw string) (*Task, *Task, error) {
 			return err
 		}
 
-		if tags == nil && cur != nil {
+		if len(tags) == 0 && cur != nil {
 			tags = cur.Tags
 		}
+
 		created = NewTask(desc, tags)
 		if err := created.insert(tx); err != nil {
 			return err
 		}
 
 		return nil
-	}); err != nil {
-		return nil, nil, err
-	}
+	})
 
-	return created, cur, nil
+	return created, cur, err
 }
 
 // Stop stops the current task if any.
@@ -106,11 +104,13 @@ func (tt *TT) Stop() (*Task, error) {
 	return cur, nil
 }
 
-// parseRawDesc splits the description and tags from user input.
+// ParseRawDesc splits the description and tags from user input.
 // tags can only be provided at the end of the string.
-func parseRawDesc(raw string) (string, []string) {
+func ParseRawDesc(raw string) (string, []string) {
 	reverse := func(v []string) {
-		sort.Slice(v, func(i, j int) bool { return true })
+		for i, j := 0, len(v)-1; i < j; i, j = i+1, j-1 {
+			v[i], v[j] = v[j], v[i]
+		}
 	}
 
 	var (
@@ -168,11 +168,12 @@ func doInitialMigration(db *sql.DB) error {
         );`,
 
 		`CREATE TABLE "Task" (
+            "ID" integer NOT NULL,
             "Description" text NOT NULL,
             "StartedAt" integer NOT NULL,
             "StoppedAt" integer NULL,
             "Tags" text COLLATE 'BINARY' NOT NULL,
-            PRIMARY KEY ("StartedAt")
+            PRIMARY KEY ("ID")
         );`,
 
 		`INSERT INTO "Config" ("Key", "Value") VALUES (
@@ -199,4 +200,48 @@ func getVersion(db *sql.DB) int {
 	}
 
 	return version
+}
+
+func (tt *TT) GetTasks() ([]Task, error) {
+	var ret []Task
+
+	if err := tt.transaction(func(tx *sql.Tx) (err error) {
+		ret, err = getAllTasks(tx)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (tt *TT) DeleteTask(taskID int64) error {
+	return tt.transaction(func(tx *sql.Tx) error {
+		return deleteTask(tx, taskID)
+	})
+}
+
+func (tt *TT) UpdateTask(t Task) error {
+	return tt.transaction(t.update)
+}
+
+func (tt *TT) CurrentTask() (*Task, error) {
+	var cur *Task
+
+	if err := tt.transaction(func(tx *sql.Tx) (err error) {
+		cur, err = getCurrentTask(tx)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return cur, nil
 }

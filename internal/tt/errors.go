@@ -7,6 +7,7 @@ import (
 
 var ErrContinue = errors.New("continuing identical running task")
 var ErrNoCurrentTask = errors.New("there is no running task")
+var ErrInvalidTaskID = errors.New("invalid task ID")
 
 type ErrIO struct {
 	msg, path string

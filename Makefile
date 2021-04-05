@@ -2,9 +2,9 @@ VERSION=$(shell git describe --tags)
 BUILDFLAGS=-ldflags '-X main.Version=${VERSION}'
 EXEC=tt
 
-all: $(EXEC) tt.man
+all: $(EXEC) tt.en.man
 
-tt.man: man.md
+tt.en.man: man.en.md
 	VERSION="$(VERSION)" \
 	DATE="$(shell date '+%B %d, %Y')" \
 			envsubst '$$VERSION:$$DATE' < "$<" > "man.subst.md"
@@ -13,6 +13,9 @@ tt.man: man.md
 
 $(EXEC):
 	go build ${BUILDFLAGS} tt/cmd/tt
+
+debug:
+	go build ${BUILDFLAGS} -tags fixture tt/cmd/tt
 
 lint:
 	golangci-lint run
@@ -23,4 +26,14 @@ tags:
 test:
 	go test ./...
 
-.PHONY: $(EXEC) lint tags test
+vendor:
+	go get -v
+	go mod vendor
+	go mod tidy
+
+upgrade:
+	go get -u -v
+	go mod vendor
+	go mod tidy
+
+.PHONY: $(EXEC) lint tags test vendor upgrade

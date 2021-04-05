@@ -1,3 +1,4 @@
+// nolint:thelper
 package tt_test
 
 import (
@@ -49,14 +50,14 @@ func testBasicsStopTask(t *testing.T, app *tt.TT) {
 
 func testBasicsCorrectedTask(t *testing.T, app *tt.TT) {
 	created, updated, err := app.Start("desc @tag")
-	if err != nil {
-		t.Error(err)
+	if !errors.Is(err, tt.ErrContinue) {
+		t.Errorf("expected error to be ErrContinue, got %v", err)
 	}
 	if created != nil {
 		t.Errorf("expected created to be nil, got %v", created)
 	}
-	if updated != nil {
-		t.Errorf("expected created to be nil, got %v", updated)
+	if updated == nil {
+		t.Error("expected updated to non nil")
 	}
 
 	created, updated, err = app.Start("desc @other-tag")
@@ -119,4 +120,34 @@ func newTestApp(t *testing.T) *tt.TT {
 	})
 
 	return app
+}
+
+func TestParseRawDesc(t *testing.T) {
+	cases := []struct {
+		input        string
+		expectedDesc string
+		expectedTags []string
+	}{
+		{"", "", nil},
+		{"@", "", []string{"@"}},
+		{"foo", "foo", nil},
+		{"foo @bar", "foo", []string{"@bar"}},
+		{"foo @bar @baz", "foo", []string{"@bar", "@baz"}},
+		{"foo @bar baz @booze", "foo @bar baz", []string{"@booze"}},
+		{
+			"stupidly long description with many tags just to see how the line will break on the grid, here comes the tag which @are @not @poundtags @since @you @cannot @type @them @in @cli @without @escaping", // nolint:lll
+			"stupidly long description with many tags just to see how the line will break on the grid, here comes the tag which",
+			[]string{"@are", "@cannot", "@cli", "@escaping", "@in", "@not", "@poundtags", "@since", "@them", "@type", "@without", "@you"}, // nolint:lll
+		},
+	}
+
+	for k, v := range cases {
+		desc, tags := tt.ParseRawDesc(v.input)
+		if desc != v.expectedDesc {
+			t.Errorf("case #%d description does not match: expected '%s' got '%s'", k, v.expectedDesc, desc)
+		}
+		if !reflect.DeepEqual(tags, v.expectedTags) {
+			t.Errorf("case #%d tags do not match: expected %v got %v", k, v.expectedTags, tags)
+		}
+	}
 }

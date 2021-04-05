@@ -2,11 +2,16 @@
 linters:
   enable-all: true
   disable:
-    # Zero values are an excellent feature, this linter is moronic.
-    - exhaustivestruct
+    # Moronic linters
+    - exhaustivestruct  # Zero values are an excellent feature.
+    - godox  # No, a TODO is not an error.
+    - gomnd
 
     # Unacceptable styling or incompatibilities with gofmt
     - gci
     - gofumpt
     - nlreturn
     - wsl
+
+    # Disagreements.
+    - paralleltest
