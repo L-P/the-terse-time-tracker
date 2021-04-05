@@ -12,6 +12,17 @@ func (tt *TT) Fixture() error {
 	words := loadTags()
 
 	return tt.transaction(func(tx *sql.Tx) error {
+		tasks, err := tt.GetTasks()
+		if err != nil {
+			return err
+		}
+
+		for _, v := range tasks {
+			if err := deleteTask(tx, v.ID); err != nil {
+				return nil
+			}
+		}
+
 		var i int
 		now := time.Now()
 		min := now.Add(24 * 7 * -time.Hour)

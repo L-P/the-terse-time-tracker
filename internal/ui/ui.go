@@ -92,7 +92,7 @@ func (ui *UI) initTable() {
 	ui.table.SetSelectable(true, false).SetFixed(1, 0)
 	ui.table.SetSeparator(tview.Borders.Vertical)
 
-	tasks, err := ui.tt.Tasks()
+	tasks, err := ui.tt.GetTasks()
 	if err != nil {
 		ui.printError("error: unable to read tasks: %s", err)
 		tasks = nil
@@ -144,7 +144,7 @@ func (ui *UI) saveFormTask() {
 		return
 	}
 
-	if err := ui.tt.Update(task); err != nil {
+	if err := ui.tt.UpdateTask(task); err != nil {
 		ui.printError("error: can't update: %s", err) // TODO proper error display
 		return
 	}
@@ -167,7 +167,7 @@ func (ui *UI) deleteSelectedTask() {
 		return
 	}
 
-	if err := ui.tt.Delete(ui.selectedTask().ID); err != nil {
+	if err := ui.tt.DeleteTask(ui.selectedTask().ID); err != nil {
 		ui.printError("error: can't delete: %s", err) // TODO proper error display
 		return
 	}

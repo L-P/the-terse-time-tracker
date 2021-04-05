@@ -202,7 +202,7 @@ func getVersion(db *sql.DB) int {
 	return version
 }
 
-func (tt *TT) Tasks() ([]Task, error) {
+func (tt *TT) GetTasks() ([]Task, error) {
 	var ret []Task
 
 	if err := tt.transaction(func(tx *sql.Tx) (err error) {
@@ -219,13 +219,13 @@ func (tt *TT) Tasks() ([]Task, error) {
 	return ret, nil
 }
 
-func (tt *TT) Delete(taskID int64) error {
+func (tt *TT) DeleteTask(taskID int64) error {
 	return tt.transaction(func(tx *sql.Tx) error {
 		return deleteTask(tx, taskID)
 	})
 }
 
-func (tt *TT) Update(t Task) error {
+func (tt *TT) UpdateTask(t Task) error {
 	return tt.transaction(t.update)
 }
 
