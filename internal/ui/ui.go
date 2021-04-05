@@ -52,17 +52,34 @@ func (ui *UI) init() {
 }
 
 func (ui *UI) inputCapture(event *tcell.EventKey) *tcell.EventKey {
-	if event.Key() == tcell.KeyEscape {
-		if ui.form.HasFocus() {
-			ui.app.SetFocus(ui.table)
-			return nil
-		}
-
-		ui.app.Stop()
-		return nil
+	if ui.form.HasFocus() {
+		return ui.formInputCapture(event)
 	}
 
-	return event
+	return ui.tableInputCapture(event)
+}
+
+func (ui *UI) formInputCapture(event *tcell.EventKey) *tcell.EventKey {
+	switch event.Key() { // nolint:exhaustive
+	case tcell.KeyEscape:
+		ui.app.SetFocus(ui.table)
+		return nil
+	default:
+		return event
+	}
+}
+
+func (ui *UI) tableInputCapture(event *tcell.EventKey) *tcell.EventKey {
+	switch event.Key() { // nolint:exhaustive
+	case tcell.KeyEscape:
+		ui.app.Stop()
+	case tcell.KeyDelete:
+		ui.deleteSelectedTask()
+	default:
+		return event
+	}
+
+	return nil
 }
 
 func (ui *UI) printError(msg string, args ...interface{}) {
@@ -111,7 +128,7 @@ func (ui *UI) updateForm(task tt.Task) {
 		AddInputField(t("Stopped at"), formDate(task.StoppedAt), 16, nil, nil).
 		AddInputField(t("Tags"), strings.Join(task.Tags, " "), 0, nil, nil).
 		AddButton(t("Save"), ui.saveFormTask).
-		AddButton(t("Delete"), ui.deleteFormTask)
+		AddButton(t("Delete"), ui.deleteSelectedTask)
 }
 
 func (ui *UI) saveFormTask() {
@@ -143,7 +160,7 @@ func (ui *UI) selectedTask() tt.Task {
 	return ui.tasks[ui.selectedTaskIndex]
 }
 
-func (ui *UI) deleteFormTask() {
+func (ui *UI) deleteSelectedTask() {
 	ui.app.SetFocus(ui.table)
 	if len(ui.tasks) == 0 {
 		return

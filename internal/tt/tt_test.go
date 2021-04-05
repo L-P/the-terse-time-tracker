@@ -1,3 +1,4 @@
+// nolint:thelper
 package tt_test
 
 import (

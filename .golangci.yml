@@ -12,3 +12,6 @@ linters:
     - gofumpt
     - nlreturn
     - wsl
+
+    # Disagreements.
+    - paralleltest
