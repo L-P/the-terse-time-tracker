@@ -84,6 +84,7 @@ func (ui *UI) tableInputCapture(event *tcell.EventKey) *tcell.EventKey {
 
 func (ui *UI) printError(msg string, args ...interface{}) {
 	// TODO proper error display
+	// nolint:forbidigo
 	fmt.Print("\x1b[0m" + fmt.Sprintf(msg, args...))
 }
 

@@ -1,4 +1,4 @@
-// nolint:gosec,wrapcheck
+// nolint:gosec
 package tt
 
 import (
