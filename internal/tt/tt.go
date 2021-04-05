@@ -34,47 +34,58 @@ func (tt *TT) Close() error {
 
 // Start can start a new task and stop the current one, update a current task,
 // or do nothing.
-// It returns the created task if any, and the updated (current) task if any.
+// It returns the current task (if any) and next task (always). If the task is
+// the same, the data might differ.
 func (tt *TT) Start(raw string) (*Task, *Task, error) {
 	desc, tags := ParseRawDesc(raw)
-	var cur, created *Task
+	var current, next *Task
 
 	err := tt.transaction(func(tx *sql.Tx) (err error) {
-		cur, err = getCurrentTask(tx)
+		current, err = getCurrentTask(tx)
 		if err != nil {
 			return err
 		}
 
-		if cur != nil && cur.Description == desc {
-			if reflect.DeepEqual(cur.Tags, tags) {
+		// Same task, maybe update tags.
+		if current != nil && (current.Description == desc || desc == "") {
+			next = &Task{}
+			*next = *current
+
+			if reflect.DeepEqual(current.Tags, tags) {
 				return ErrContinue
 			}
 
 			// Tags differ, update current task with new tags.
-			cur.Tags = tags
-			if err := cur.update(tx); err != nil {
+			next.Tags = tags
+			if err := next.update(tx); err != nil {
 				return err
 			}
 			return nil
 		}
 
-		if err := stopCurrentTask(tx); err != nil {
-			return err
+		if current != nil {
+			if err := stopTask(tx, current.ID); err != nil {
+				return err
+			}
 		}
 
-		if len(tags) == 0 && cur != nil {
-			tags = cur.Tags
+		if len(tags) == 0 && current != nil {
+			tags = current.Tags
 		}
 
-		created = NewTask(desc, tags)
-		if err := created.insert(tx); err != nil {
+		if desc == "" {
+			return ErrInvalidTaskDesc
+		}
+
+		next = NewTask(desc, tags)
+		if err := next.insert(tx); err != nil {
 			return err
 		}
 
 		return nil
 	})
 
-	return created, cur, err
+	return current, next, err
 }
 
 // Stop stops the current task if any.
@@ -92,7 +103,7 @@ func (tt *TT) Stop() (*Task, error) {
 		}
 
 		cur.StoppedAt = time.Now()
-		if err := stopCurrentTask(tx); err != nil {
+		if err := stopTask(tx, cur.ID); err != nil {
 			return err
 		}
 

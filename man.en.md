@@ -10,7 +10,7 @@ tt [-start] description
 tt *option*
 
 # DESCRIPTION
-The Terse Time Tracker tracks time spent on tasks and creates reports.
+The Terse Time Tracker tracks time spent on tasks.
 
 # OPTIONS
 If no option is given, *start* is implied.

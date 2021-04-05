@@ -17,6 +17,10 @@ type Task struct {
 	StoppedAt   time.Time // will be a zero time for the task in progress
 }
 
+func (t *Task) IsStopped() bool {
+	return !t.StoppedAt.IsZero()
+}
+
 // taskProxy is the Task as stored in DB.
 type taskProxy struct {
 	ID          int64
@@ -196,11 +200,12 @@ func getCurrentTask(tx *sql.Tx) (*Task, error) {
 	return proxy.Task()
 }
 
-func stopCurrentTask(tx *sql.Tx) error {
+func stopTask(tx *sql.Tx, id int64) error {
 	return exec(
 		tx,
-		`UPDATE Task SET StoppedAt = ? WHERE StoppedAt IS NULL`,
+		`UPDATE Task SET StoppedAt = ? WHERE ID = ?`,
 		util.NewNullTimeAsTimestamp(time.Now()),
+		id,
 	)
 }
 

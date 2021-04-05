@@ -76,13 +76,13 @@ func showCurrent(app *tt.TT, out io.Writer) error {
 }
 
 func start(app *tt.TT, args []string, out io.Writer) error {
-	started, updated, err := app.Start(strings.Join(args, " "))
+	prev, next, err := app.Start(strings.Join(args, " "))
 	if err != nil {
 		if errors.Is(err, tt.ErrContinue) {
 			fmt.Fprintf(
 				out,
 				t("Task has already been running for %s, not doing anything.\n"),
-				util.FormatDuration(time.Since(updated.StartedAt)),
+				util.FormatDuration(time.Since(prev.StartedAt)),
 			)
 			return nil
 		}
@@ -90,22 +90,20 @@ func start(app *tt.TT, args []string, out io.Writer) error {
 		return err
 	}
 
-	if started != nil {
-		fmt.Fprintf(out, t("Created task: \"%s\"\n"), started.Description)
-		if len(started.Tags) > 0 {
-			fmt.Fprintf(out, t("With tags: \"%s\"\n"), strings.Join(started.Tags, " "))
-		}
+	if prev != nil && prev.ID != next.ID {
+		writeStoppedTaskMessage(out, *prev)
 	}
 
-	if updated != nil { // nolint:nestif
-		if updated.StoppedAt.IsZero() {
-			if len(updated.Tags) == 0 {
-				fmt.Fprint(out, "Removed tags from current task.\n")
-			} else if started == nil {
-				fmt.Fprintf(out, "Updated task with new tags: %s\n", strings.Join(updated.Tags, " "))
-			}
+	if prev == nil || prev.ID != next.ID {
+		fmt.Fprintf(out, t("Created task: \"%s\"\n"), next.Description)
+		if len(next.Tags) > 0 {
+			fmt.Fprintf(out, t("With tags: \"%s\"\n"), strings.Join(next.Tags, " "))
+		}
+	} else if prev != nil && prev.ID == next.ID {
+		if len(next.Tags) == 0 {
+			fmt.Fprint(out, "Removed tags from current task.\n")
 		} else {
-			writeStoppedTaskMessage(out, *updated)
+			fmt.Fprintf(out, "Replaced tags from current task: %s\n", strings.Join(next.Tags, " "))
 		}
 	}
 
