@@ -39,7 +39,7 @@ func (tt *TT) Start(raw string) (*Task, *Task, error) {
 	desc, tags := ParseRawDesc(raw)
 	var cur, created *Task
 
-	if err := tt.transaction(func(tx *sql.Tx) (err error) {
+	err := tt.transaction(func(tx *sql.Tx) (err error) {
 		cur, err = getCurrentTask(tx)
 		if err != nil {
 			return err
@@ -47,8 +47,7 @@ func (tt *TT) Start(raw string) (*Task, *Task, error) {
 
 		if cur != nil && cur.Description == desc {
 			if reflect.DeepEqual(cur.Tags, tags) {
-				cur = nil
-				return nil
+				return ErrContinue
 			}
 
 			// Tags differ, update current task with new tags.
@@ -73,11 +72,9 @@ func (tt *TT) Start(raw string) (*Task, *Task, error) {
 		}
 
 		return nil
-	}); err != nil {
-		return nil, nil, err
-	}
+	})
 
-	return created, cur, nil
+	return created, cur, err
 }
 
 // Stop stops the current task if any.

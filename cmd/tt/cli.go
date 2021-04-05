@@ -79,7 +79,11 @@ func start(app *tt.TT, args []string, out io.Writer) error {
 	started, updated, err := app.Start(strings.Join(args, " "))
 	if err != nil {
 		if errors.Is(err, tt.ErrContinue) {
-			fmt.Fprint(out, t("Task is already running, not doing anything.\n"))
+			fmt.Fprintf(
+				out,
+				t("Task has already been running for %s, not doing anything.\n"),
+				util.FormatDuration(time.Since(updated.StartedAt)),
+			)
 			return nil
 		}
 

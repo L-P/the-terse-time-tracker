@@ -50,14 +50,14 @@ func testBasicsStopTask(t *testing.T, app *tt.TT) {
 
 func testBasicsCorrectedTask(t *testing.T, app *tt.TT) {
 	created, updated, err := app.Start("desc @tag")
-	if err != nil {
-		t.Error(err)
+	if !errors.Is(err, tt.ErrContinue) {
+		t.Errorf("expected error to be ErrContinue, got %v", err)
 	}
 	if created != nil {
 		t.Errorf("expected created to be nil, got %v", created)
 	}
-	if updated != nil {
-		t.Errorf("expected created to be nil, got %v", updated)
+	if updated == nil {
+		t.Error("expected updated to non nil")
 	}
 
 	created, updated, err = app.Start("desc @other-tag")
