@@ -14,6 +14,9 @@ tt.en.man: man.en.md
 $(EXEC):
 	go build ${BUILDFLAGS} tt/cmd/tt
 
+debug:
+	go build ${BUILDFLAGS} -tags fixture tt/cmd/tt
+
 lint:
 	golangci-lint run
 

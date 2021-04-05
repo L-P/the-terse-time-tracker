@@ -1,3 +1,5 @@
+//+build fixture
+
 // nolint:gosec
 package tt
 
