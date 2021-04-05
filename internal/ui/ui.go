@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -46,9 +47,12 @@ func New(tt *tt.TT) *UI {
 func (ui *UI) init() {
 	ui.initLayout()
 	ui.initTable()
-	ui.updateForm(ui.selectedTask())
-
 	ui.flex.SetInputCapture(ui.inputCapture)
+	ui.app.SetRoot(ui.flex, true).SetFocus(ui.flex)
+
+	if len(ui.tasks) > 0 {
+		ui.table.Select(1, 0)
+	}
 }
 
 func (ui *UI) inputCapture(event *tcell.EventKey) *tcell.EventKey {
@@ -82,6 +86,8 @@ func (ui *UI) tableInputCapture(event *tcell.EventKey) *tcell.EventKey {
 		ui.app.Stop()
 	case tcell.KeyDelete:
 		ui.deleteSelectedTask()
+	case tcell.KeyF5:
+		ui.updateTasksTable(ui.tasks)
 	default:
 		return event
 	}
@@ -106,19 +112,16 @@ func (ui *UI) initTable() {
 	}
 
 	ui.table.SetSelectionChangedFunc(func(row, col int) {
-		if row < 1 { // row 0 is the table labels
-			return
-		}
-
 		ui.selectedTaskIndex = row - 1
-		ui.updateForm(ui.selectedTask())
+		selected, _ := ui.selectedTask()
+		ui.updateForm(selected)
 	})
 
 	ui.table.SetSelectedFunc(func(row, col int) {
 		ui.app.SetFocus(ui.form)
 	})
 
-	ui.updateTasks(tasks)
+	ui.updateTasksTable(tasks)
 }
 
 const ( // must match the AddInputField order below
@@ -145,7 +148,7 @@ func (ui *UI) saveFormTask() {
 		return
 	}
 
-	task, err := ui.formTask()
+	task, err := ui.getFormTask()
 	if err != nil {
 		ui.printError("error: invalid task:  %s", err) // TODO proper error display
 		return
@@ -157,48 +160,52 @@ func (ui *UI) saveFormTask() {
 	}
 
 	ui.tasks[ui.selectedTaskIndex] = task
-	ui.updateTasks(ui.tasks)
+	ui.updateTasksTable(ui.tasks)
 }
 
-func (ui *UI) selectedTask() tt.Task {
-	if len(ui.tasks) == 0 {
-		return tt.Task{}
+var errNoSelection = errors.New("no selection")
+
+func (ui *UI) selectedTask() (tt.Task, error) {
+	if len(ui.tasks) == 0 || ui.selectedTaskIndex < 0 {
+		return tt.Task{}, errNoSelection
 	}
 
-	return ui.tasks[ui.selectedTaskIndex]
+	return ui.tasks[ui.selectedTaskIndex], nil
 }
 
 func (ui *UI) deleteSelectedTask() {
 	ui.app.SetFocus(ui.table)
-	if len(ui.tasks) == 0 {
+	selected, err := ui.selectedTask()
+	if err != nil {
 		return
 	}
 
-	if err := ui.tt.DeleteTask(ui.selectedTask().ID); err != nil {
+	if err := ui.tt.DeleteTask(selected.ID); err != nil {
 		ui.printError("error: can't delete: %s", err) // TODO proper error display
 		return
 	}
 
-	ui.tasks = append(ui.tasks[:ui.selectedTaskIndex], ui.tasks[ui.selectedTaskIndex+1:]...)
-	ui.selectedTaskIndex = clamp(ui.selectedTaskIndex-1, 0, len(ui.tasks)-1)
+	tasks := append(ui.tasks[:ui.selectedTaskIndex], ui.tasks[ui.selectedTaskIndex+1:]...)
 
-	ui.updateForm(ui.selectedTask())
-	ui.updateTasks(ui.tasks)
-}
+	// TODO: starts to feel sluggish after 100k tasks, but RemoveRow incurs
+	// additional complexity.
+	ui.updateTasksTable(tasks)
 
-func clamp(v, min, max int) int {
-	if v < min {
-		return min
+	// when removing the last row the selection is lost
+	if max := len(tasks) - 1; ui.selectedTaskIndex >= max {
+		ui.selectedTaskIndex = max
 	}
 
-	if v > max {
-		return max
-	}
-
-	return v
+	// let the selection callback update the rest
+	ui.table.Select(ui.selectedTaskIndex+1, 0)
 }
 
-func (ui *UI) formTask() (tt.Task, error) {
+func (ui *UI) getFormTask() (tt.Task, error) {
+	selected, err := ui.selectedTask()
+	if err != nil {
+		return tt.Task{}, err
+	}
+
 	// Indices are from the input order in the form definition in updateForm.
 	value := func(i int) string {
 		return ui.form.GetFormItem(i).(*tview.InputField).GetText()
@@ -225,7 +232,7 @@ func (ui *UI) formTask() (tt.Task, error) {
 	}
 
 	return tt.Task{
-		ID:          ui.selectedTask().ID,
+		ID:          selected.ID,
 		Description: value(formFieldIndexDescription),
 		StartedAt:   startedAt,
 		StoppedAt:   stoppedAt,
@@ -241,8 +248,10 @@ func formDate(t time.Time) string {
 	return t.Format(dateTimeFormat)
 }
 
-func (ui *UI) updateTasks(tasks []tt.Task) {
+func (ui *UI) updateTasksTable(tasks []tt.Task) {
 	ui.tasks = tasks
+
+	ui.table.Clear()
 	for i, v := range []string{
 		t("Description"), t("Started at"), t("Stopped at"), t("Tags"),
 	} {
@@ -293,8 +302,6 @@ func (ui *UI) initLayout() {
 }
 
 func (ui *UI) Run() error {
-	ui.app.SetRoot(ui.flex, true).SetFocus(ui.flex)
-
 	return ui.app.Run()
 }
 
