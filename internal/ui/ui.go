@@ -12,11 +12,12 @@ import (
 )
 
 const (
-	maxDescLen     = 40
-	maxTagsLen     = 40
-	dateFormat     = "2006-01-02"
-	dateTimeFormat = "2006-01-02 15:04:05"
-	timeFormat     = "15:04:05"
+	maxDescLen         = 40
+	maxTagsLen         = 40
+	dateFormat         = "2006-01-02"
+	timeFormat         = "15:04"
+	dateTimeFormat     = dateFormat + " " + timeFormat
+	formDateTimeFormat = dateTimeFormat + ":05"
 )
 
 type UI struct {
@@ -135,8 +136,8 @@ func (ui *UI) updateForm(task tt.Task) {
 	ui.form.Clear(true)
 	ui.form.
 		AddInputField(t("Description"), task.Description, 0, nil, nil).
-		AddInputField(t("Started at"), formDate(task.StartedAt), 16, nil, nil).
-		AddInputField(t("Stopped at"), formDate(task.StoppedAt), 16, nil, nil).
+		AddInputField(t("Started at"), formDate(task.StartedAt), len(formDateTimeFormat), nil, nil).
+		AddInputField(t("Stopped at"), formDate(task.StoppedAt), len(formDateTimeFormat), nil, nil).
 		AddInputField(t("Tags"), strings.Join(task.Tags, " "), 0, nil, nil).
 		AddButton(t("Save"), ui.saveFormTask).
 		AddButton(t("Delete"), ui.deleteSelectedTask)
@@ -245,7 +246,7 @@ func formDate(t time.Time) string {
 		return ""
 	}
 
-	return t.Format(dateTimeFormat)
+	return t.Format(formDateTimeFormat)
 }
 
 func (ui *UI) updateTasksTable(tasks []tt.Task) {
