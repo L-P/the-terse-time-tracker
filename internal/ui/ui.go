@@ -215,7 +215,7 @@ func (ui *UI) getFormTask() (tt.Task, error) {
 	_, tags := tt.ParseRawDesc(value(formFieldIndexTags))
 
 	location := time.Now().Location()
-	startedAt, err := time.ParseInLocation(dateTimeFormat, value(formFieldIndexStartedAt), location)
+	startedAt, err := time.ParseInLocation(formDateTimeFormat, value(formFieldIndexStartedAt), location)
 	if err != nil {
 		return tt.Task{}, tt.ErrInvalidInput(err.Error())
 	}
