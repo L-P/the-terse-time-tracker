@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	"tt/internal/tt"
+	"tt/internal/util"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -254,7 +255,7 @@ func (ui *UI) updateTasksTable(tasks []tt.Task) {
 
 	ui.table.Clear()
 	for i, v := range []string{
-		t("Description"), t("Started at"), t("Stopped at"), t("Tags"),
+		t("Description"), t("Started at"), t("Stopped at"), t("Duration"), t("Tags"),
 	} {
 		cell := tview.NewTableCell(v).SetAttributes(tcell.AttrBold)
 		cell.NotSelectable = true
@@ -277,10 +278,13 @@ func (ui *UI) updateTasksTable(tasks []tt.Task) {
 			stoppedAt = v.StoppedAt.Format(timeFormat)
 		}
 
+		duration := util.FormatDuration(v.Duration())
+
 		ui.table.SetCell(rowID, 0, tview.NewTableCell(clampString(v.Description, maxDescLen)))
 		ui.table.SetCell(rowID, 1, tview.NewTableCell(startedAt).SetAlign(tview.AlignRight))
 		ui.table.SetCell(rowID, 2, tview.NewTableCell(stoppedAt).SetAlign(tview.AlignRight))
-		ui.table.SetCell(rowID, 3, tview.NewTableCell(clampString(strings.Join(v.Tags, " "), maxTagsLen)))
+		ui.table.SetCell(rowID, 3, tview.NewTableCell(duration).SetAlign(tview.AlignRight))
+		ui.table.SetCell(rowID, 4, tview.NewTableCell(clampString(strings.Join(v.Tags, " "), maxTagsLen)))
 		rowID++
 	}
 }
