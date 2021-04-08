@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 )
 
 type Config struct {
@@ -13,11 +14,17 @@ type Config struct {
 
 func (c Config) Validate() error {
 	if c.WeeklyHours < 0 {
-		return errors.New("WeeklyHours cannot be negative")
+		return ErrInvalidInput("WeeklyHours cannot be negative")
+	}
+	if c.WeeklyHours > (7 * 24 * time.Hour).Hours() {
+		return ErrInvalidInput("WeeklyHours must fit in a week")
 	}
 
 	if c.MonthlyHours < 0 {
-		return errors.New("MonthlyHours cannot be negative")
+		return ErrInvalidInput("MonthlyHours cannot be negative")
+	}
+	if c.MonthlyHours > (31 * 7 * 24 * time.Hour).Hours() {
+		return ErrInvalidInput("MonthlyHours must fit in a month")
 	}
 
 	return nil

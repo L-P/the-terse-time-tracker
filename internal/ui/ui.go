@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 	"tt/internal/tt"
 
@@ -24,13 +25,13 @@ const (
 )
 
 /* Layout:
-    mainFlex {
-    mainPages [
-        taskFlex {taskTable, taskForm}
-        configForm
-    ]
-    mainFooter
-}
+   mainFlex {
+     mainPages [
+       taskFlex {taskTable, taskForm}
+       configForm
+     ]
+     mainFooter
+   }
 */
 
 // UI holds the state for the TUI.
@@ -86,6 +87,7 @@ const (
 func (ui *UI) init() {
 	ui.initMainLayout()
 	ui.initTaskPageLayout()
+	ui.updateConfigForm(ui.tt.GetConfig())
 
 	ui.mainPages.AddPage(pageTasks, ui.taskFlex, true, true)
 	ui.mainPages.AddPage(pageConfig, ui.configForm, true, false)
@@ -117,7 +119,7 @@ func (ui *UI) inputCapture(event *tcell.EventKey) *tcell.EventKey {
 		return ui.taskTableInputCapture(event)
 	}
 
-	return nil
+	return event
 }
 
 func (ui *UI) printError(msg string, args ...interface{}) {
@@ -161,5 +163,46 @@ func (ui *UI) initMainLayout() {
 	}
 	for _, v := range pages {
 		fmt.Fprintf(ui.mainFooter, `%s ["%s"][darkcyan]%s[white][""]  `, v.key, v.name, v.title)
+	}
+}
+
+const ( // must match the AddInputField order below
+	configFormFieldIndexWeeklyHours = iota
+	configFormFieldIndexMonthlyHours
+)
+
+func (ui *UI) updateConfigForm(config tt.Config) {
+	float := func(v float64) string {
+		return strconv.FormatFloat(v, 'f', 2, 64)
+	}
+	acceptFloat := func(str string, _ rune) bool {
+		_, err := strconv.ParseFloat(str, 64)
+		return err == nil
+	}
+
+	ui.configForm.
+		Clear(true).
+		AddInputField(t("Weekly hours"), float(config.WeeklyHours), 8, acceptFloat, nil).
+		AddInputField(t("Monthly hours"), float(config.MonthlyHours), 8, acceptFloat, nil).
+		AddButton(t("Save"), ui.saveConfigForm)
+}
+
+func (ui *UI) saveConfigForm() {
+	float := func(i int) float64 {
+		str := ui.configForm.GetFormItem(i).(*tview.InputField).GetText()
+		f, err := strconv.ParseFloat(str, 64)
+		if err != nil {
+			return 0
+		}
+
+		return f
+	}
+
+	config := ui.tt.GetConfig()
+	config.WeeklyHours = float(configFormFieldIndexWeeklyHours)
+	config.MonthlyHours = float(configFormFieldIndexMonthlyHours)
+
+	if err := ui.tt.SetConfig(config); err != nil {
+		ui.printError("error: unable to save config:  %s", err) // TODO proper error display
 	}
 }

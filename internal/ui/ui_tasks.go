@@ -87,8 +87,8 @@ const ( // must match the AddInputField order below
 )
 
 func (ui *UI) updateTaskForm(task tt.Task) {
-	ui.taskForm.Clear(true)
 	ui.taskForm.
+		Clear(true).
 		AddInputField(t("Description"), task.Description, 0, nil, nil).
 		AddInputField(t("Started at"), formDate(task.StartedAt), len(formDateTimeFormat), nil, nil).
 		AddInputField(t("Stopped at"), formDate(task.StoppedAt), len(formDateTimeFormat), nil, nil).
