@@ -80,10 +80,10 @@ func (ui *UI) initTaskTable() {
 }
 
 const ( // must match the AddInputField order below
-	formFieldIndexDescription = iota
-	formFieldIndexStartedAt
-	formFieldIndexStoppedAt
-	formFieldIndexTags
+	taskFormFieldIndexDescription = iota
+	taskFormFieldIndexStartedAt
+	taskFormFieldIndexStoppedAt
+	taskFormFieldIndexTags
 )
 
 func (ui *UI) updateTaskForm(task tt.Task) {
@@ -108,17 +108,17 @@ func (ui *UI) getTaskFormTask() (tt.Task, error) {
 		return ui.taskForm.GetFormItem(i).(*tview.InputField).GetText()
 	}
 
-	_, tags := tt.ParseRawDesc(value(formFieldIndexTags))
+	_, tags := tt.ParseRawDesc(value(taskFormFieldIndexTags))
 
 	location := time.Now().Location()
-	startedAt, err := time.ParseInLocation(formDateTimeFormat, value(formFieldIndexStartedAt), location)
+	startedAt, err := time.ParseInLocation(formDateTimeFormat, value(taskFormFieldIndexStartedAt), location)
 	if err != nil {
 		return tt.Task{}, tt.ErrInvalidInput(err.Error())
 	}
 
 	var stoppedAt time.Time
-	if str := value(formFieldIndexStoppedAt); str != "" {
-		stoppedAt, err = time.ParseInLocation(dateTimeFormat, str, location)
+	if str := value(taskFormFieldIndexStoppedAt); str != "" {
+		stoppedAt, err = time.ParseInLocation(formDateTimeFormat, str, location)
 		if err != nil {
 			return tt.Task{}, tt.ErrInvalidInput(err.Error())
 		}
@@ -130,7 +130,7 @@ func (ui *UI) getTaskFormTask() (tt.Task, error) {
 
 	return tt.Task{
 		ID:          selected.ID,
-		Description: value(formFieldIndexDescription),
+		Description: value(taskFormFieldIndexDescription),
 		StartedAt:   startedAt,
 		StoppedAt:   stoppedAt,
 		Tags:        tags,
