@@ -82,13 +82,28 @@ func (t *Task) Duration() time.Duration {
 }
 
 func getAllTasks(tx *sql.Tx) ([]Task, error) {
-	var ret []Task
-
-	query := fmt.Sprintf( // nolint:gosec
+	return queryTasks(tx, fmt.Sprintf(
 		`SELECT %s FROM Task ORDER BY StartedAt DESC`,
 		taskProxyFields(),
+	))
+}
+
+func getTasksInRange(tx *sql.Tx, startTime, endTime time.Time) ([]Task, error) {
+	start, end := startTime.Unix(), endTime.Unix()
+
+	query := fmt.Sprintf(
+		`SELECT %s FROM Task
+        WHERE (StartedAt >= ? AND StartedAt < ?)
+           OR (StoppedAt > ? AND StoppedAt < ?) OR StoppedAt IS NULL
+        ORDER BY StartedAt DESC`,
+		taskProxyFields(),
 	)
-	rows, err := tx.Query(query)
+
+	return queryTasks(tx, query, start, end, start, end)
+}
+
+func queryTasks(tx *sql.Tx, query string, params ...interface{}) ([]Task, error) {
+	rows, err := tx.Query(query, params...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -98,6 +113,7 @@ func getAllTasks(tx *sql.Tx) ([]Task, error) {
 	}
 	defer rows.Close()
 
+	var ret []Task
 	for rows.Next() {
 		var proxy taskProxy
 		if err := proxy.scan(rows); err != nil {

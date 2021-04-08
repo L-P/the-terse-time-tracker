@@ -9,22 +9,26 @@ import (
 )
 
 type Config struct {
-	WeeklyHours, MonthlyHours float64
+	WeeklyHours, MonthlyHours time.Duration
 }
 
 func (c Config) Validate() error {
 	if c.WeeklyHours < 0 {
 		return ErrInvalidInput("WeeklyHours cannot be negative")
 	}
-	if c.WeeklyHours > (7 * 24 * time.Hour).Hours() {
+	if c.WeeklyHours > (7 * 24 * time.Hour) {
 		return ErrInvalidInput("WeeklyHours must fit in a week")
 	}
 
 	if c.MonthlyHours < 0 {
 		return ErrInvalidInput("MonthlyHours cannot be negative")
 	}
-	if c.MonthlyHours > (31 * 7 * 24 * time.Hour).Hours() {
+	if c.MonthlyHours > (31 * 7 * 24 * time.Hour) {
 		return ErrInvalidInput("MonthlyHours must fit in a month")
+	}
+
+	if c.WeeklyHours != 0 && c.MonthlyHours != 0 && c.WeeklyHours > c.MonthlyHours {
+		return ErrInvalidInput("WeeklyHours must be < MonthlyHours")
 	}
 
 	return nil
@@ -37,12 +41,22 @@ func (c *Config) scan(s scannable) error {
 		return err
 	}
 
+	asDuration := func(str string) (time.Duration, error) {
+		i, err := strconv.ParseInt(str, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+
+		return time.Duration(i), nil
+	}
+
 	var err error
+
 	switch key {
 	case "WeeklyHours":
-		c.WeeklyHours, err = strconv.ParseFloat(value, 64)
+		c.WeeklyHours, err = asDuration(value)
 	case "MonthlyHours":
-		c.MonthlyHours, err = strconv.ParseFloat(value, 64)
+		c.MonthlyHours, err = asDuration(value)
 	case "MigrationVersion": // NOP
 	default:
 		err = fmt.Errorf("unknown configuration key: %s", key)

@@ -3,7 +3,6 @@ package ui
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 	"tt/internal/tt"
 
@@ -172,25 +171,22 @@ const ( // must match the AddInputField order below
 )
 
 func (ui *UI) updateConfigForm(config tt.Config) {
-	float := func(v float64) string {
-		return strconv.FormatFloat(v, 'f', 2, 64)
-	}
-	acceptFloat := func(str string, _ rune) bool {
-		_, err := strconv.ParseFloat(str, 64)
+	acceptDuration := func(str string, _ rune) bool {
+		_, err := time.ParseDuration(str)
 		return err == nil
 	}
 
 	ui.configForm.
 		Clear(true).
-		AddInputField(t("Weekly hours"), float(config.WeeklyHours), 8, acceptFloat, nil).
-		AddInputField(t("Monthly hours"), float(config.MonthlyHours), 8, acceptFloat, nil).
+		AddInputField(t("Weekly hours"), config.WeeklyHours.String(), 12, acceptDuration, nil).
+		AddInputField(t("Monthly hours"), config.MonthlyHours.String(), 12, acceptDuration, nil).
 		AddButton(t("Save"), ui.saveConfigForm)
 }
 
 func (ui *UI) saveConfigForm() {
-	float := func(i int) float64 {
+	duration := func(i int) time.Duration {
 		str := ui.configForm.GetFormItem(i).(*tview.InputField).GetText()
-		f, err := strconv.ParseFloat(str, 64)
+		f, err := time.ParseDuration(str)
 		if err != nil {
 			return 0
 		}
@@ -199,8 +195,8 @@ func (ui *UI) saveConfigForm() {
 	}
 
 	config := ui.tt.GetConfig()
-	config.WeeklyHours = float(configFormFieldIndexWeeklyHours)
-	config.MonthlyHours = float(configFormFieldIndexMonthlyHours)
+	config.WeeklyHours = duration(configFormFieldIndexWeeklyHours)
+	config.MonthlyHours = duration(configFormFieldIndexMonthlyHours)
 
 	if err := ui.tt.SetConfig(config); err != nil {
 		ui.printError("error: unable to save config:  %s", err) // TODO proper error display
