@@ -12,7 +12,8 @@ import (
 )
 
 type TT struct {
-	db *sql.DB
+	db     *sql.DB
+	config Config
 }
 
 func New(dsn string) (*TT, error) {
@@ -25,7 +26,15 @@ func New(dsn string) (*TT, error) {
 		return nil, ErrIO{"unable to migrate DB", dsn, err}
 	}
 
-	return &TT{db: db}, nil
+	config, err := loadConfig(db)
+	if err != nil {
+		return nil, ErrRuntime(fmt.Sprintf("unable to load config: %s", err))
+	}
+
+	return &TT{
+		db:     db,
+		config: config,
+	}, nil
 }
 
 func (tt *TT) Close() error {
@@ -255,4 +264,17 @@ func (tt *TT) CurrentTask() (*Task, error) {
 	}
 
 	return cur, nil
+}
+
+func (tt *TT) GetConfig() Config {
+	return tt.config
+}
+
+func (tt *TT) SetConfig(config Config) error {
+	if err := config.Validate(); err != nil {
+		return err
+	}
+
+	tt.config = config
+	return tt.transaction(tt.config.save)
 }
