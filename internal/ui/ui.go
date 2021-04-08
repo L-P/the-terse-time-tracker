@@ -12,6 +12,10 @@ import (
 	"github.com/rivo/tview"
 )
 
+func t(msg string) string {
+	return msg // TODO, handle locale
+}
+
 const (
 	maxDescLen         = 40
 	maxTagsLen         = 40
@@ -21,13 +25,31 @@ const (
 	formDateTimeFormat = dateTimeFormat + ":05"
 )
 
+/* Layout:
+    mainFlex {
+    mainPages [
+        taskFlex {taskTable, taskForm}
+        configForm
+    ]
+    mainFooter
+}
+*/
+
+// UI holds the state for the TUI.
 type UI struct {
 	tt  *tt.TT
 	app *tview.Application
 
-	flex  *tview.Flex
-	table *tview.Table
-	form  *tview.Form
+	mainFlex   *tview.Flex
+	mainPages  *tview.Pages
+	mainFooter *tview.TextView
+
+	// Task view.
+	taskFlex  *tview.Flex
+	taskTable *tview.Table
+	taskForm  *tview.Form
+
+	configForm *tview.Form
 
 	tasks             []tt.Task
 	selectedTaskIndex int // index in tasks slice
@@ -35,10 +57,18 @@ type UI struct {
 
 func New(tt *tt.TT) *UI {
 	ui := UI{
-		tt:    tt,
-		app:   tview.NewApplication(),
-		table: tview.NewTable(),
-		form:  tview.NewForm(),
+		tt:  tt,
+		app: tview.NewApplication(),
+
+		mainPages:  tview.NewPages(),
+		mainFlex:   tview.NewFlex(),
+		mainFooter: tview.NewTextView(),
+
+		taskFlex:  tview.NewFlex(),
+		taskTable: tview.NewTable(),
+		taskForm:  tview.NewForm(),
+
+		configForm: tview.NewForm(),
 	}
 
 	ui.init()
@@ -46,36 +76,63 @@ func New(tt *tt.TT) *UI {
 	return &ui
 }
 
-func (ui *UI) init() {
-	ui.initLayout()
-	ui.initTable()
-	ui.flex.SetInputCapture(ui.inputCapture)
-	ui.app.SetRoot(ui.flex, true).SetFocus(ui.flex)
+func (ui *UI) Run() error {
+	return ui.app.Run()
+}
 
-	if len(ui.tasks) > 0 {
-		ui.table.Select(1, 0)
-	}
+const (
+	pageTasks  = "tasks"
+	pageConfig = "config"
+)
+
+func (ui *UI) init() {
+	ui.initMainLayout()
+	ui.initTaskPageLayout()
+
+	ui.mainPages.AddPage(pageTasks, ui.taskFlex, true, true)
+	ui.mainPages.AddPage(pageConfig, ui.configForm, true, false)
+
+	ui.mainPages.SetInputCapture(ui.inputCapture)
+	ui.app.SetRoot(ui.mainFlex, true).SetFocus(ui.taskTable)
+	ui.setActivePage(pageTasks)
+}
+
+func (ui *UI) setActivePage(name string) {
+	ui.mainPages.SwitchToPage(name)
+	ui.mainFooter.Highlight(name)
 }
 
 func (ui *UI) inputCapture(event *tcell.EventKey) *tcell.EventKey {
-	if ui.form.HasFocus() {
-		return ui.formInputCapture(event)
+	switch event.Key() { // nolint:exhaustive
+	case tcell.KeyF1:
+		ui.setActivePage(pageTasks)
+		return nil
+	case tcell.KeyF2:
+		ui.setActivePage(pageConfig)
+		return nil
 	}
 
-	return ui.tableInputCapture(event)
+	switch {
+	case ui.taskForm.HasFocus():
+		return ui.taskFormInputCapture(event)
+	case ui.taskTable.HasFocus():
+		return ui.taskTableInputCapture(event)
+	}
+
+	return nil
 }
 
-func (ui *UI) formInputCapture(event *tcell.EventKey) *tcell.EventKey {
+func (ui *UI) taskFormInputCapture(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() { // nolint:exhaustive
 	case tcell.KeyEscape:
-		ui.app.SetFocus(ui.table)
+		ui.app.SetFocus(ui.taskTable)
 		return nil
 	default:
 		return event
 	}
 }
 
-func (ui *UI) tableInputCapture(event *tcell.EventKey) *tcell.EventKey {
+func (ui *UI) taskTableInputCapture(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() { // nolint:exhaustive
 	case tcell.KeyRune:
 		switch event.Rune() {
@@ -103,9 +160,10 @@ func (ui *UI) printError(msg string, args ...interface{}) {
 	fmt.Print("\x1b[0m" + fmt.Sprintf(msg, args...))
 }
 
-func (ui *UI) initTable() {
-	ui.table.SetSelectable(true, false).SetFixed(1, 0)
-	ui.table.SetSeparator(tview.Borders.Vertical)
+func (ui *UI) initTaskTable() {
+	ui.taskTable.SetBorder(true).SetTitle(t("Past tasks"))
+	ui.taskTable.SetSelectable(true, false).SetFixed(1, 0)
+	ui.taskTable.SetSeparator(tview.Borders.Vertical)
 
 	tasks, err := ui.tt.GetTasks()
 	if err != nil {
@@ -113,17 +171,21 @@ func (ui *UI) initTable() {
 		tasks = nil
 	}
 
-	ui.table.SetSelectionChangedFunc(func(row, col int) {
+	ui.taskTable.SetSelectionChangedFunc(func(row, col int) {
 		ui.selectedTaskIndex = row - 1
 		selected, _ := ui.selectedTask()
 		ui.updateForm(selected)
 	})
 
-	ui.table.SetSelectedFunc(func(row, col int) {
-		ui.app.SetFocus(ui.form)
+	ui.taskTable.SetSelectedFunc(func(row, col int) {
+		ui.app.SetFocus(ui.taskForm)
 	})
 
 	ui.updateTasksTable(tasks)
+
+	if len(tasks) > 0 {
+		ui.taskTable.Select(1, 0)
+	}
 }
 
 const ( // must match the AddInputField order below
@@ -134,8 +196,8 @@ const ( // must match the AddInputField order below
 )
 
 func (ui *UI) updateForm(task tt.Task) {
-	ui.form.Clear(true)
-	ui.form.
+	ui.taskForm.Clear(true)
+	ui.taskForm.
 		AddInputField(t("Description"), task.Description, 0, nil, nil).
 		AddInputField(t("Started at"), formDate(task.StartedAt), len(formDateTimeFormat), nil, nil).
 		AddInputField(t("Stopped at"), formDate(task.StoppedAt), len(formDateTimeFormat), nil, nil).
@@ -145,7 +207,7 @@ func (ui *UI) updateForm(task tt.Task) {
 }
 
 func (ui *UI) saveFormTask() {
-	ui.app.SetFocus(ui.table)
+	ui.app.SetFocus(ui.taskTable)
 	if len(ui.tasks) == 0 {
 		return
 	}
@@ -176,7 +238,7 @@ func (ui *UI) selectedTask() (tt.Task, error) {
 }
 
 func (ui *UI) deleteSelectedTask() {
-	ui.app.SetFocus(ui.table)
+	ui.app.SetFocus(ui.taskTable)
 	selected, err := ui.selectedTask()
 	if err != nil {
 		return
@@ -199,7 +261,7 @@ func (ui *UI) deleteSelectedTask() {
 	}
 
 	// let the selection callback update the rest
-	ui.table.Select(ui.selectedTaskIndex+1, 0)
+	ui.taskTable.Select(ui.selectedTaskIndex+1, 0)
 }
 
 func (ui *UI) getFormTask() (tt.Task, error) {
@@ -210,7 +272,7 @@ func (ui *UI) getFormTask() (tt.Task, error) {
 
 	// Indices are from the input order in the form definition in updateForm.
 	value := func(i int) string {
-		return ui.form.GetFormItem(i).(*tview.InputField).GetText()
+		return ui.taskForm.GetFormItem(i).(*tview.InputField).GetText()
 	}
 
 	_, tags := tt.ParseRawDesc(value(formFieldIndexTags))
@@ -253,13 +315,13 @@ func formDate(t time.Time) string {
 func (ui *UI) updateTasksTable(tasks []tt.Task) {
 	ui.tasks = tasks
 
-	ui.table.Clear()
+	ui.taskTable.Clear()
 	for i, v := range []string{
 		t("Description"), t("Started at"), t("Stopped at"), t("Duration"), t("Tags"),
 	} {
 		cell := tview.NewTableCell(v).SetAttributes(tcell.AttrBold)
 		cell.NotSelectable = true
-		ui.table.SetCell(0, i, cell)
+		ui.taskTable.SetCell(0, i, cell)
 	}
 
 	var lastLineDay string
@@ -280,11 +342,11 @@ func (ui *UI) updateTasksTable(tasks []tt.Task) {
 
 		duration := util.FormatDuration(v.Duration())
 
-		ui.table.SetCell(rowID, 0, tview.NewTableCell(clampString(v.Description, maxDescLen)))
-		ui.table.SetCell(rowID, 1, tview.NewTableCell(startedAt).SetAlign(tview.AlignRight))
-		ui.table.SetCell(rowID, 2, tview.NewTableCell(stoppedAt).SetAlign(tview.AlignRight))
-		ui.table.SetCell(rowID, 3, tview.NewTableCell(duration).SetAlign(tview.AlignRight))
-		ui.table.SetCell(rowID, 4, tview.NewTableCell(clampString(strings.Join(v.Tags, " "), maxTagsLen)))
+		ui.taskTable.SetCell(rowID, 0, tview.NewTableCell(clampString(v.Description, maxDescLen)))
+		ui.taskTable.SetCell(rowID, 1, tview.NewTableCell(startedAt).SetAlign(tview.AlignRight))
+		ui.taskTable.SetCell(rowID, 2, tview.NewTableCell(stoppedAt).SetAlign(tview.AlignRight))
+		ui.taskTable.SetCell(rowID, 3, tview.NewTableCell(duration).SetAlign(tview.AlignRight))
+		ui.taskTable.SetCell(rowID, 4, tview.NewTableCell(clampString(strings.Join(v.Tags, " "), maxTagsLen)))
 		rowID++
 	}
 }
@@ -297,19 +359,31 @@ func clampString(v string, max int) string {
 	return v
 }
 
-func (ui *UI) initLayout() {
-	ui.table.SetBorder(true).SetTitle(t("Past tasks"))
-	ui.form.SetBorder(true).SetTitle(t("Selected task"))
+func (ui *UI) initTaskPageLayout() {
+	ui.taskFlex.
+		AddItem(ui.taskTable, 0, 2, true).
+		AddItem(ui.taskForm, 0, 1, true)
 
-	ui.flex = tview.NewFlex().
-		AddItem(ui.table, 0, 2, true).
-		AddItem(ui.form, 0, 1, true)
+	ui.initTaskTable()
+	ui.taskForm.SetBorder(true).SetTitle(t("Selected task"))
 }
 
-func (ui *UI) Run() error {
-	return ui.app.Run()
-}
+func (ui *UI) initMainLayout() {
+	ui.mainFlex.
+		SetDirection(tview.FlexRow).
+		AddItem(ui.mainPages, 0, 1, true).
+		AddItem(ui.mainFooter, 1, 1, false)
 
-func t(msg string) string {
-	return msg // TODO, handle locale
+	ui.mainFooter.
+		SetDynamicColors(true).
+		SetRegions(true).
+		SetWrap(false)
+
+	pages := []struct{ name, title, key string }{
+		{pageTasks, t("Tasks"), "F1"},
+		{pageConfig, t("Config"), "F2"},
+	}
+	for _, v := range pages {
+		fmt.Fprintf(ui.mainFooter, `%s ["%s"][darkcyan]%s[white][""]  `, v.key, v.name, v.title)
+	}
 }
