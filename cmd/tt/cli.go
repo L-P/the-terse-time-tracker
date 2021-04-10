@@ -61,16 +61,29 @@ func showCurrent(app *tt.TT, out io.Writer) error {
 
 	if cur == nil {
 		fmt.Fprint(out, t("There is no task running.\n"))
-		return nil
+		return tt.ErrExitCode(1)
 	}
 
 	fmt.Fprintf(
 		out,
-		t("Current task: %s %s, running for %s\n"),
+		t("Current task: %s %s, running for %s.\n"),
 		cur.Description,
 		strings.Join(cur.Tags, " "),
 		util.FormatDuration(time.Since(cur.StartedAt)),
 	)
+
+	if dur, err := app.GetDailyDurationLeft(); err == nil {
+		switch {
+		case dur > 0:
+			fmt.Fprintf(out, t("Time left before overtime: %s.\n"), util.FormatDuration(dur))
+		case dur < 0:
+			fmt.Fprintf(out, t("Current overtime: %s.\n"), util.FormatDuration(-dur))
+		default:
+			fmt.Fprint(out, t("Time to leave.\n"))
+		}
+	} else if !errors.Is(err, tt.ErrNotConfigured) {
+		return err
+	}
 
 	return nil
 }
@@ -113,7 +126,7 @@ func start(app *tt.TT, args []string, out io.Writer) error {
 func writeStoppedTaskMessage(out io.Writer, task tt.Task) {
 	fmt.Fprintf(
 		out,
-		t("Stopped task that had been running for %s: \"%s\"\n"),
+		t("Stopped task that had been running for %s: \"%s\".\n"),
 		task.Duration().Round(time.Second),
 		task.Description,
 	)

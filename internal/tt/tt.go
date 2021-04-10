@@ -12,7 +12,8 @@ import (
 )
 
 type TT struct {
-	db *sql.DB
+	db     *sql.DB
+	config Config
 }
 
 func New(dsn string) (*TT, error) {
@@ -25,7 +26,15 @@ func New(dsn string) (*TT, error) {
 		return nil, ErrIO{"unable to migrate DB", dsn, err}
 	}
 
-	return &TT{db: db}, nil
+	config, err := loadConfig(db)
+	if err != nil {
+		return nil, ErrRuntime(fmt.Sprintf("unable to load config: %s", err))
+	}
+
+	return &TT{
+		db:     db,
+		config: config,
+	}, nil
 }
 
 func (tt *TT) Close() error {
@@ -255,4 +264,67 @@ func (tt *TT) CurrentTask() (*Task, error) {
 	}
 
 	return cur, nil
+}
+
+func (tt *TT) GetConfig() Config {
+	return tt.config
+}
+
+func (tt *TT) SetConfig(config Config) error {
+	if err := config.Validate(); err != nil {
+		return err
+	}
+
+	tt.config = config
+	return tt.transaction(tt.config.save)
+}
+
+func (tt *TT) GetDailyDurationLeft() (time.Duration, error) {
+	dailyHours, err := tt.getDailyHours()
+	if err != nil {
+		return 0, err
+	}
+
+	dayStart := time.Now().Truncate(24 * time.Hour)
+	dayEnd := dayStart.AddDate(0, 0, 1)
+
+	var tasks []Task
+	if err := tt.transaction(func(tx *sql.Tx) (err error) {
+		tasks, err = getTasksInRange(tx, dayStart, dayEnd)
+		return err
+	}); err != nil {
+		return 0, err
+	}
+
+	var acc time.Duration
+	for _, task := range tasks {
+		start := task.StartedAt
+		if start.Before(dayStart) {
+			start = dayStart
+		}
+
+		end := task.StoppedAt
+		if end.IsZero() {
+			end = time.Now()
+		} else if end.After(dayEnd) {
+			end = dayEnd // should not happen if data is clean
+		}
+
+		acc += end.Sub(start)
+	}
+
+	return dailyHours - acc, nil
+}
+
+func (tt *TT) getDailyHours() (time.Duration, error) {
+	if tt.config.WeeklyHours <= 0 {
+		return 0, ErrNotConfigured
+	}
+
+	curDay := time.Now().Weekday()
+	if curDay == time.Saturday || curDay == time.Sunday {
+		return 0, nil
+	}
+
+	return tt.config.WeeklyHours / 5, nil
 }
