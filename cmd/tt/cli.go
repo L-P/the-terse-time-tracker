@@ -61,7 +61,7 @@ func showCurrent(app *tt.TT, out io.Writer) error {
 
 	if cur == nil {
 		fmt.Fprint(out, t("There is no task running.\n"))
-		return nil
+		return tt.ErrExitCode(1)
 	}
 
 	fmt.Fprintf(

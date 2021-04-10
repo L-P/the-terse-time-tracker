@@ -37,8 +37,11 @@ type (
 	ErrInvalidInput string // user provided invalid data
 	ErrDatabase     string // database driver error
 	ErrRuntime      string // generic runtime error
+	ErrExitCode     int    // normal error that needs to bubble up to the shell
 )
 
 func (e ErrInvalidInput) Error() string { return string(e) }
 func (e ErrDatabase) Error() string     { return string(e) }
 func (e ErrRuntime) Error() string      { return string(e) }
+func (e ErrExitCode) Error() string     { return fmt.Sprintf("exit code %d", e.Code()) }
+func (e ErrExitCode) Code() int         { return int(e) }
