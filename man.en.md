@@ -1,4 +1,4 @@
-% TT(1) tt $VERSION
+% TT(1) tt | $VERSION
 % Written by Léo Peltier
 % $DATE
 
@@ -13,7 +13,9 @@ tt *option*
 The Terse Time Tracker tracks time spent on tasks.
 
 # OPTIONS
-If no option is given, *start* is implied.
+If no option is given, *start* is implied. If no option and no descriptin is
+given, tt will output the current running task or exit with code 1 if there is
+no current task.
 
 *-start*
 :   Either creates a new task and stops the current one, or edits the current
@@ -24,7 +26,8 @@ If no option is given, *start* is implied.
 :   Stops the current task timer.
 
 *-ui*
-:   Starts the TUI that allow editing past entries.
+:   Starts the TUI that allows editing past entries and changing the
+    configuration.
 
 *-v*
 :   Displays the version and exits.
@@ -32,3 +35,6 @@ If no option is given, *start* is implied.
 # DATA
 The Terse Time Tracker stores all of its data in a SQLite database named
 `the-terse-time-tracker.db` in your default user configuration directory.
+
+The configuration is stored in the same database and can be accessed through
+the TUI by pressing F2.
