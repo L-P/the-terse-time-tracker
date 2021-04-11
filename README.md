@@ -1,6 +1,9 @@
 # The Terse Time Tracker
 Or `tt` for short.
 
+Project state: usable but WIP, no reports yet. I will implement what I need
+when I need it.
+
 ## Usage
 ```sh
 # Start working on a task:

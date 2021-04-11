@@ -3,5 +3,6 @@
 - Feedback when saving stuff in TUI
 - Proper error output in TUI (same channel as save feedback?)
 - Implement modal datetime picker
+- Package as raw executable
 - Package as a Debian package.
 - Mouse input (eww)
