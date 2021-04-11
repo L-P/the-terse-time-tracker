@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 	"tt/internal/tt"
+	"unicode"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -179,9 +180,17 @@ const ( // must match the AddInputField order below
 )
 
 func (ui *UI) updateConfigForm(config tt.Config) {
-	acceptDuration := func(str string, _ rune) bool {
-		_, err := time.ParseDuration(str)
-		return err == nil
+	acceptDuration := func(str string, r rune) bool {
+		if unicode.IsNumber(r) {
+			return true
+		}
+
+		// Allow unit after numbers.
+		if r == 'h' || r == 'm' || r == 's' {
+			return len(str) >= 2 && unicode.IsNumber(rune(str[len(str)-2]))
+		}
+
+		return false
 	}
 
 	ui.configForm.
