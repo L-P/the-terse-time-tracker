@@ -19,16 +19,6 @@ func (ui *UI) initTaskPageLayout() {
 	ui.taskForm.SetBorder(true).SetTitle(t("Selected task"))
 }
 
-func (ui *UI) taskFormInputCapture(event *tcell.EventKey) *tcell.EventKey {
-	switch event.Key() { // nolint:exhaustive
-	case tcell.KeyEscape:
-		ui.app.SetFocus(ui.taskTable)
-		return nil
-	default:
-		return event
-	}
-}
-
 func (ui *UI) taskTableInputCapture(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() { // nolint:exhaustive
 	case tcell.KeyRune:

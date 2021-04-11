@@ -112,10 +112,18 @@ func (ui *UI) inputCapture(event *tcell.EventKey) *tcell.EventKey {
 	}
 
 	switch {
-	case ui.taskForm.HasFocus():
-		return ui.taskFormInputCapture(event)
 	case ui.taskTable.HasFocus():
 		return ui.taskTableInputCapture(event)
+	case ui.taskForm.HasFocus():
+		if event.Key() == tcell.KeyEscape {
+			ui.app.SetFocus(ui.taskTable)
+			return nil
+		}
+	case ui.configForm.HasFocus():
+		if event.Key() == tcell.KeyEscape {
+			ui.app.Stop()
+			return nil
+		}
 	}
 
 	return event
