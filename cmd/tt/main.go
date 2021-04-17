@@ -17,7 +17,7 @@ import (
 var Version = "unknown"
 
 func main() {
-	if err := run(os.Args[1:], os.Stderr); err != nil {
+	if err := run(os.Args[1:], os.Stdout); err != nil {
 		var inputError tt.ErrInvalidInput
 		if errors.As(err, &inputError) {
 			fmt.Fprintf(os.Stderr, "error: %s\n", err)

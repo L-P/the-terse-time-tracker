@@ -32,6 +32,10 @@ no current task.
 *-v*
 :   Displays the version and exits.
 
+*-json*
+:   Outputs data as JSON rather than human-readable text, currently only
+    available for option-less calls for scripting purposes.
+
 # DATA
 The Terse Time Tracker stores all of its data in a SQLite database named
 `the-terse-time-tracker.db` in your default user configuration directory.

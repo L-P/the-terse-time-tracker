@@ -1,3 +1,4 @@
+- Handle missing days (count missing day as one done in weekly overtime computation)
 - Handle French overtime laws, plan for other computation methods
 - Output monthly reports
 - Feedback when saving stuff in TUI

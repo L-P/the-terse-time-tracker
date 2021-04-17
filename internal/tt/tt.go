@@ -9,6 +9,8 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3" // SQL driver
+
+	"tt/internal/util"
 )
 
 type TT struct {
@@ -279,18 +281,34 @@ func (tt *TT) SetConfig(config Config) error {
 	return tt.transaction(tt.config.save)
 }
 
-func (tt *TT) GetDailyDurationLeft() (time.Duration, error) {
-	dailyHours, err := tt.getDailyHours()
-	if err != nil {
-		return 0, err
+func (tt *TT) GetDurationLeft() (time.Duration, time.Duration, error) {
+	if tt.config.WeeklyHours <= 0 {
+		return 0, 0, ErrNotConfigured
 	}
 
-	dayStart := time.Now().Truncate(24 * time.Hour)
-	dayEnd := dayStart.AddDate(0, 0, 1)
+	now := time.Now()
 
+	dayStart := util.GetStartOfDay(now)
+	dayEnd := dayStart.AddDate(0, 0, 1)
+	daily, err := tt.getAggregatedTime(dayStart, dayEnd)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	weekStart := util.GetStartOfWeek(now)
+	weekEnd := weekStart.AddDate(0, 0, 7)
+	weekly, err := tt.getAggregatedTime(weekStart, weekEnd)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return (tt.config.WeeklyHours / 5) - daily, tt.config.WeeklyHours - weekly, nil
+}
+
+func (tt *TT) getAggregatedTime(start, end time.Time) (time.Duration, error) {
 	var tasks []Task
 	if err := tt.transaction(func(tx *sql.Tx) (err error) {
-		tasks, err = getTasksInRange(tx, dayStart, dayEnd)
+		tasks, err = getTasksInRange(tx, start, end)
 		return err
 	}); err != nil {
 		return 0, err
@@ -298,33 +316,20 @@ func (tt *TT) GetDailyDurationLeft() (time.Duration, error) {
 
 	var acc time.Duration
 	for _, task := range tasks {
-		start := task.StartedAt
-		if start.Before(dayStart) {
-			start = dayStart
+		clampedStart := task.StartedAt
+		if clampedStart.Before(start) {
+			clampedStart = start
 		}
 
-		end := task.StoppedAt
-		if end.IsZero() {
-			end = time.Now()
-		} else if end.After(dayEnd) {
-			end = dayEnd // should not happen if data is clean
+		clampedEnd := task.StoppedAt
+		if clampedEnd.IsZero() {
+			clampedEnd = time.Now()
+		} else if clampedEnd.After(end) {
+			clampedEnd = end
 		}
 
-		acc += end.Sub(start)
+		acc += clampedEnd.Sub(clampedStart)
 	}
 
-	return dailyHours - acc, nil
-}
-
-func (tt *TT) getDailyHours() (time.Duration, error) {
-	if tt.config.WeeklyHours <= 0 {
-		return 0, ErrNotConfigured
-	}
-
-	curDay := time.Now().Weekday()
-	if curDay == time.Saturday || curDay == time.Sunday {
-		return 0, nil
-	}
-
-	return tt.config.WeeklyHours / 5, nil
+	return acc, nil
 }
