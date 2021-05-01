@@ -9,7 +9,7 @@ import (
 )
 
 type Config struct {
-	WeeklyHours, MonthlyHours time.Duration
+	WeeklyHours time.Duration
 }
 
 func (c Config) Validate() error {
@@ -18,17 +18,6 @@ func (c Config) Validate() error {
 	}
 	if c.WeeklyHours > (7 * 24 * time.Hour) {
 		return ErrInvalidInput("WeeklyHours must fit in a week")
-	}
-
-	if c.MonthlyHours < 0 {
-		return ErrInvalidInput("MonthlyHours cannot be negative")
-	}
-	if c.MonthlyHours > (31 * 7 * 24 * time.Hour) {
-		return ErrInvalidInput("MonthlyHours must fit in a month")
-	}
-
-	if c.WeeklyHours != 0 && c.MonthlyHours != 0 && c.WeeklyHours > c.MonthlyHours {
-		return ErrInvalidInput("WeeklyHours must be < MonthlyHours")
 	}
 
 	return nil
@@ -55,8 +44,6 @@ func (c *Config) scan(s scannable) error {
 	switch key {
 	case "WeeklyHours":
 		c.WeeklyHours, err = asDuration(value)
-	case "MonthlyHours":
-		c.MonthlyHours, err = asDuration(value)
 	case "MigrationVersion": // NOP
 	default:
 		err = fmt.Errorf("unknown configuration key: %s", key)
@@ -94,8 +81,7 @@ func loadConfig(db *sql.DB) (Config, error) {
 
 func (c Config) save(tx *sql.Tx) error {
 	for k, v := range map[string]interface{}{
-		"WeeklyHours":  c.WeeklyHours,
-		"MonthlyHours": c.MonthlyHours,
+		"WeeklyHours": c.WeeklyHours,
 	} {
 		if err := exec(
 			tx,
