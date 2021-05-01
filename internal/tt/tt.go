@@ -162,68 +162,6 @@ func ParseRawDesc(raw string) (string, []string) {
 	return desc, tags
 }
 
-func migrate(db *sql.DB) (err error) {
-	cur := getVersion(db)
-	if cur < 0 {
-		return ErrDatabase(fmt.Sprintf("invalid database version: %d", cur))
-	}
-
-	switch cur {
-	case 0:
-		err = doInitialMigration(db)
-		fallthrough
-	case 1:
-		break // current version
-	default:
-		return ErrDatabase(fmt.Sprintf("database is at version %d which is not compatible with your local tt version", cur))
-	}
-
-	return err
-}
-
-func doInitialMigration(db *sql.DB) error {
-	queries := []string{
-		`CREATE TABLE "Config" (
-            "Key" text NOT NULL,
-            "Value" text COLLATE 'BINARY' NOT NULL,
-            PRIMARY KEY ("Key")
-        );`,
-
-		`CREATE TABLE "Task" (
-            "ID" integer NOT NULL,
-            "Description" text NOT NULL,
-            "StartedAt" integer NOT NULL,
-            "StoppedAt" integer NULL,
-            "Tags" text COLLATE 'BINARY' NOT NULL,
-            PRIMARY KEY ("ID")
-        );`,
-
-		`INSERT INTO "Config" ("Key", "Value") VALUES (
-            'MigrationVersion', 1
-        )`,
-	}
-
-	for k := range queries {
-		_, err := db.Exec(queries[k])
-		if err != nil {
-			return ErrBadQuery{err, queries[k], nil}
-		}
-	}
-
-	return nil
-}
-
-func getVersion(db *sql.DB) int {
-	var version int
-	if err := db.QueryRow(
-		`SELECT Value FROM Config WHERE Key = 'MigrationVersion' LIMIT 1`,
-	).Scan(&version); err != nil {
-		return 0
-	}
-
-	return version
-}
-
 func (tt *TT) GetTasks() ([]Task, error) {
 	var ret []Task
 
