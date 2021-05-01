@@ -32,6 +32,9 @@ no current task.
 *-v*
 :   Displays the version and exits.
 
+*-report*
+:   Outputs weekly reports.
+
 *-json*
 :   Outputs data as JSON rather than human-readable text, currently only
     available for option-less calls for scripting purposes.
