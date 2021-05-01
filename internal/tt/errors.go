@@ -10,6 +10,7 @@ var ErrNoCurrentTask = errors.New("there is no running task")
 var ErrInvalidTaskID = errors.New("invalid task ID")
 var ErrInvalidTaskDesc = errors.New("invalid task description")
 var ErrNotConfigured = errors.New("missing configuration for this feature")
+var ErrNoTasks = errors.New("no tasks are present in the specified range")
 
 type ErrIO struct {
 	msg, path string

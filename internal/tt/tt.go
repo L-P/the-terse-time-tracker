@@ -220,35 +220,40 @@ func (tt *TT) SetConfig(config Config) error {
 }
 
 func (tt *TT) GetDurationLeft() (time.Duration, time.Duration, error) {
-	if tt.config.WeeklyHours <= 0 {
-		return 0, 0, ErrNotConfigured
-	}
+	var daily, weekly time.Duration
 
-	now := time.Now()
+	if err := tt.transaction(func(tx *sql.Tx) (err error) {
+		if tt.config.WeeklyHours <= 0 {
+			return ErrNotConfigured
+		}
 
-	dayStart := util.GetStartOfDay(now)
-	dayEnd := dayStart.AddDate(0, 0, 1)
-	daily, err := tt.getAggregatedTime(dayStart, dayEnd)
-	if err != nil {
-		return 0, 0, err
-	}
+		now := time.Now()
 
-	weekStart := util.GetStartOfWeek(now)
-	weekEnd := weekStart.AddDate(0, 0, 7)
-	weekly, err := tt.getAggregatedTime(weekStart, weekEnd)
-	if err != nil {
+		dayStart := util.GetStartOfDay(now)
+		dayEnd := dayStart.AddDate(0, 0, 1)
+		daily, err = tt.getAggregatedTime(tx, dayStart, dayEnd)
+		if err != nil {
+			return err
+		}
+
+		weekStart := util.GetStartOfWeek(now)
+		weekEnd := weekStart.AddDate(0, 0, 7)
+		weekly, err = tt.getAggregatedTime(tx, weekStart, weekEnd)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
 		return 0, 0, err
 	}
 
 	return (tt.config.WeeklyHours / 5) - daily, tt.config.WeeklyHours - weekly, nil
 }
 
-func (tt *TT) getAggregatedTime(start, end time.Time) (time.Duration, error) {
-	var tasks []Task
-	if err := tt.transaction(func(tx *sql.Tx) (err error) {
-		tasks, err = getTasksInRange(tx, start, end)
-		return err
-	}); err != nil {
+func (tt *TT) getAggregatedTime(tx *sql.Tx, start, end time.Time) (time.Duration, error) {
+	tasks, err := getTasksInRange(tx, start, end)
+	if err != nil {
 		return 0, err
 	}
 
@@ -270,4 +275,30 @@ func (tt *TT) getAggregatedTime(start, end time.Time) (time.Duration, error) {
 	}
 
 	return acc, nil
+}
+
+func (tt *TT) getWorkedHoursBounds(tx *sql.Tx, t time.Time) (time.Time, time.Time, error) {
+	dayStart := util.GetStartOfDay(t)
+	dayEnd := dayStart.AddDate(0, 0, 1)
+
+	tasks, err := getTasksInRange(tx, dayStart, dayEnd)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+
+	if len(tasks) == 0 {
+		return time.Time{}, time.Time{}, ErrNoTasks
+	}
+
+	start := tasks[len(tasks)-1].StartedAt
+	end := tasks[0].StoppedAt
+
+	if start.Before(dayStart) {
+		start = dayStart
+	}
+	if end.After(dayEnd) {
+		end = dayEnd
+	}
+
+	return start, end, nil
 }
