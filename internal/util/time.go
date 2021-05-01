@@ -30,6 +30,29 @@ func FormatDuration(d time.Duration) string {
 	return prefix + ret
 }
 
+// Returns a duration in a fixed-width format.
+func FormatFixedDuration(d time.Duration) string {
+	if d < 0 {
+		d = -d
+	}
+
+	s := int(d.Seconds())
+	h := s / 3600
+	m := s % 3600 / 60
+
+	// TODO translation
+	return fmt.Sprintf("%02dh%02dm", h, m)
+}
+
+func FormatSignedFixedDuration(d time.Duration) string {
+	sign := '+'
+	if d < 0 {
+		sign = '-'
+	}
+
+	return fmt.Sprintf("%c%s", sign, FormatFixedDuration(d))
+}
+
 // GetStartOfDay does as it says in a tz-aware timeframe.
 func GetStartOfDay(t time.Time) time.Time {
 	return time.Date(
@@ -41,23 +64,12 @@ func GetStartOfDay(t time.Time) time.Time {
 }
 
 func GetStartOfWeek(t time.Time) time.Time {
-	var offset int
-	switch t.Weekday() {
-	case time.Monday:
-		offset = 0
-	case time.Tuesday:
-		offset = 1
-	case time.Wednesday:
-		offset = 2
-	case time.Thursday:
-		offset = 3
-	case time.Friday:
-		offset = 4
-	case time.Saturday:
-		offset = 5
-	case time.Sunday:
-		offset = 6
-	}
+	return GetStartOfDay(t).AddDate(0, 0, -WeekdayOffset(t.Weekday()))
+}
 
-	return GetStartOfDay(t).AddDate(0, 0, -offset)
+// WeekdayOffset returns the offset of a given day inside its week, week that
+// starts on Monday everywhere in the world including inside the international
+// date standard but not in the Go codebase.
+func WeekdayOffset(wd time.Weekday) int {
+	return (int(wd) + 6) % 7
 }

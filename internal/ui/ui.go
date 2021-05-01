@@ -176,7 +176,6 @@ func (ui *UI) initMainLayout() {
 
 const ( // must match the AddInputField order below
 	configFormFieldIndexWeeklyHours = iota
-	configFormFieldIndexMonthlyHours
 )
 
 func (ui *UI) updateConfigForm(config tt.Config) {
@@ -196,7 +195,6 @@ func (ui *UI) updateConfigForm(config tt.Config) {
 	ui.configForm.
 		Clear(true).
 		AddInputField(t("Weekly hours"), config.WeeklyHours.String(), 12, acceptDuration, nil).
-		AddInputField(t("Monthly hours"), config.MonthlyHours.String(), 12, acceptDuration, nil).
 		AddButton(t("Save"), ui.saveConfigForm)
 }
 
@@ -213,7 +211,6 @@ func (ui *UI) saveConfigForm() {
 
 	config := ui.tt.GetConfig()
 	config.WeeklyHours = duration(configFormFieldIndexWeeklyHours)
-	config.MonthlyHours = duration(configFormFieldIndexMonthlyHours)
 
 	if err := ui.tt.SetConfig(config); err != nil {
 		ui.printError("error: unable to save config:  %s", err) // TODO proper error display

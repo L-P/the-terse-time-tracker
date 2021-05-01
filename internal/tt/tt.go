@@ -162,68 +162,6 @@ func ParseRawDesc(raw string) (string, []string) {
 	return desc, tags
 }
 
-func migrate(db *sql.DB) (err error) {
-	cur := getVersion(db)
-	if cur < 0 {
-		return ErrDatabase(fmt.Sprintf("invalid database version: %d", cur))
-	}
-
-	switch cur {
-	case 0:
-		err = doInitialMigration(db)
-		fallthrough
-	case 1:
-		break // current version
-	default:
-		return ErrDatabase(fmt.Sprintf("database is at version %d which is not compatible with your local tt version", cur))
-	}
-
-	return err
-}
-
-func doInitialMigration(db *sql.DB) error {
-	queries := []string{
-		`CREATE TABLE "Config" (
-            "Key" text NOT NULL,
-            "Value" text COLLATE 'BINARY' NOT NULL,
-            PRIMARY KEY ("Key")
-        );`,
-
-		`CREATE TABLE "Task" (
-            "ID" integer NOT NULL,
-            "Description" text NOT NULL,
-            "StartedAt" integer NOT NULL,
-            "StoppedAt" integer NULL,
-            "Tags" text COLLATE 'BINARY' NOT NULL,
-            PRIMARY KEY ("ID")
-        );`,
-
-		`INSERT INTO "Config" ("Key", "Value") VALUES (
-            'MigrationVersion', 1
-        )`,
-	}
-
-	for k := range queries {
-		_, err := db.Exec(queries[k])
-		if err != nil {
-			return ErrBadQuery{err, queries[k], nil}
-		}
-	}
-
-	return nil
-}
-
-func getVersion(db *sql.DB) int {
-	var version int
-	if err := db.QueryRow(
-		`SELECT Value FROM Config WHERE Key = 'MigrationVersion' LIMIT 1`,
-	).Scan(&version); err != nil {
-		return 0
-	}
-
-	return version
-}
-
 func (tt *TT) GetTasks() ([]Task, error) {
 	var ret []Task
 
@@ -282,35 +220,40 @@ func (tt *TT) SetConfig(config Config) error {
 }
 
 func (tt *TT) GetDurationLeft() (time.Duration, time.Duration, error) {
-	if tt.config.WeeklyHours <= 0 {
-		return 0, 0, ErrNotConfigured
-	}
+	var daily, weekly time.Duration
 
-	now := time.Now()
+	if err := tt.transaction(func(tx *sql.Tx) (err error) {
+		if tt.config.WeeklyHours <= 0 {
+			return ErrNotConfigured
+		}
 
-	dayStart := util.GetStartOfDay(now)
-	dayEnd := dayStart.AddDate(0, 0, 1)
-	daily, err := tt.getAggregatedTime(dayStart, dayEnd)
-	if err != nil {
-		return 0, 0, err
-	}
+		now := time.Now()
 
-	weekStart := util.GetStartOfWeek(now)
-	weekEnd := weekStart.AddDate(0, 0, 7)
-	weekly, err := tt.getAggregatedTime(weekStart, weekEnd)
-	if err != nil {
+		dayStart := util.GetStartOfDay(now)
+		dayEnd := dayStart.AddDate(0, 0, 1)
+		daily, err = tt.getAggregatedTime(tx, dayStart, dayEnd)
+		if err != nil {
+			return err
+		}
+
+		weekStart := util.GetStartOfWeek(now)
+		weekEnd := weekStart.AddDate(0, 0, 7)
+		weekly, err = tt.getAggregatedTime(tx, weekStart, weekEnd)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
 		return 0, 0, err
 	}
 
 	return (tt.config.WeeklyHours / 5) - daily, tt.config.WeeklyHours - weekly, nil
 }
 
-func (tt *TT) getAggregatedTime(start, end time.Time) (time.Duration, error) {
-	var tasks []Task
-	if err := tt.transaction(func(tx *sql.Tx) (err error) {
-		tasks, err = getTasksInRange(tx, start, end)
-		return err
-	}); err != nil {
+func (tt *TT) getAggregatedTime(tx *sql.Tx, start, end time.Time) (time.Duration, error) {
+	tasks, err := getTasksInRange(tx, start, end)
+	if err != nil {
 		return 0, err
 	}
 
@@ -332,4 +275,30 @@ func (tt *TT) getAggregatedTime(start, end time.Time) (time.Duration, error) {
 	}
 
 	return acc, nil
+}
+
+func (tt *TT) getWorkedHoursBounds(tx *sql.Tx, t time.Time) (time.Time, time.Time, error) {
+	dayStart := util.GetStartOfDay(t)
+	dayEnd := dayStart.AddDate(0, 0, 1)
+
+	tasks, err := getTasksInRange(tx, dayStart, dayEnd)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+
+	if len(tasks) == 0 {
+		return time.Time{}, time.Time{}, ErrNoTasks
+	}
+
+	start := tasks[len(tasks)-1].StartedAt
+	end := tasks[0].StoppedAt
+
+	if start.Before(dayStart) {
+		start = dayStart
+	}
+	if end.After(dayEnd) {
+		end = dayEnd
+	}
+
+	return start, end, nil
 }

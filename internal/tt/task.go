@@ -88,6 +88,26 @@ func getAllTasks(tx *sql.Tx) ([]Task, error) {
 	))
 }
 
+func (tt *TT) GetFirstTask() (Task, error) {
+	var tasks []Task
+
+	if err := tt.transaction(func(tx *sql.Tx) (err error) {
+		tasks, err = queryTasks(tx, fmt.Sprintf(
+			`SELECT %s FROM Task ORDER BY StartedAt ASC LIMIT 1`,
+			taskProxyFields(),
+		))
+		return err
+	}); err != nil {
+		return Task{}, err
+	}
+
+	if len(tasks) == 0 {
+		return Task{}, ErrNoTasks
+	}
+
+	return tasks[0], nil
+}
+
 func getTasksInRange(tx *sql.Tx, startTime, endTime time.Time) ([]Task, error) {
 	start, end := startTime.Unix(), endTime.Unix()
 
