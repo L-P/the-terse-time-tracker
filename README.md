@@ -43,4 +43,20 @@ Replaced tags from current task: @world-company
 # We're done for now.
 $ tt -stop
 Stopped task that had been running for 24s: "bazzing"
+
+# Show a complete timesheet:
+$ tt -report | tail -n14
+Week #17 from 2021-04-26 to 2021-05-02
+  08:14    08:53    09:19    08:48    08:57  
+  17:16    16:53    18:15    17:10    16:53  
+  08h17m   07h21m   08h26m   07h53m   07h16m 
+ +00h29m  -00h26m  +00h38m  +00h05m  -00h31m  +00h15m  (+00h22m)
+   Mon.     Tue.     Wed.     Thu.     Fri.    Total
+
+Week #18 from 2021-05-03 to 2021-05-09
+  09:14                                      
+  16:44                                      
+  07h29m                                     
+ -00h18m                                      -00h18m  (+00h03m)
+   Mon.     Tue.     Wed.     Thu.     Fri.    Total
 ```
