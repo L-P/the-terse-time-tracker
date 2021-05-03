@@ -114,12 +114,13 @@ func getTasksInRange(tx *sql.Tx, startTime, endTime time.Time) ([]Task, error) {
 	query := fmt.Sprintf(
 		`SELECT %s FROM Task
         WHERE (StartedAt >= ? AND StartedAt < ?)
-           OR (StoppedAt > ? AND StoppedAt < ?) OR StoppedAt IS NULL
+           OR (StoppedAt > ? AND StoppedAt < ?)
+           OR (StartedAt >= ? AND StartedAt < ? AND StoppedAt IS NULL)
         ORDER BY StartedAt DESC`,
 		taskProxyFields(),
 	)
 
-	return queryTasks(tx, query, start, end, start, end)
+	return queryTasks(tx, query, start, end, start, end, start, end)
 }
 
 func queryTasks(tx *sql.Tx, query string, params ...interface{}) ([]Task, error) {

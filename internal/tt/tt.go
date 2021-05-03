@@ -298,6 +298,8 @@ func (tt *TT) getWorkedHoursBounds(tx *sql.Tx, t time.Time) (time.Time, time.Tim
 	}
 	if end.After(dayEnd) {
 		end = dayEnd
+	} else if end.IsZero() {
+		end = time.Now()
 	}
 
 	return start, end, nil
