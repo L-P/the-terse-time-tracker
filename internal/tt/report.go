@@ -16,11 +16,13 @@ type WeeklyReport struct {
 	Start, End time.Time
 	Daily      [7]DailyReport // index is time.Weekday
 	Total      time.Duration
+	Overtime   time.Duration
 }
 
 func (tt *TT) GetWeeklyReport(t time.Time) (WeeklyReport, error) {
 	report := WeeklyReport{Start: util.GetStartOfWeek(t)}
 	report.End = report.Start.AddDate(0, 0, len(report.Daily))
+	weeklyHours := tt.GetConfig().WeeklyHours
 
 	if err := tt.transaction(func(tx *sql.Tx) error {
 		for i := 0; i < len(report.Daily); i++ {
@@ -34,6 +36,8 @@ func (tt *TT) GetWeeklyReport(t time.Time) (WeeklyReport, error) {
 
 			start, end, err := tt.getWorkedHoursBounds(tx, dayStart)
 			if err == nil {
+				report.Overtime += agg - (weeklyHours / 5)
+				report.Total += agg
 				report.Daily[dayStart.Weekday()] = DailyReport{
 					Start: start,
 					End:   end,
@@ -42,8 +46,6 @@ func (tt *TT) GetWeeklyReport(t time.Time) (WeeklyReport, error) {
 			} else if !errors.Is(err, ErrNoTasks) {
 				return err
 			}
-
-			report.Total += agg
 		}
 
 		return nil

@@ -18,10 +18,9 @@ func report(app *tt.TT, out output) error {
 	}
 
 	var (
-		max         = util.GetStartOfWeek(time.Now()).AddDate(0, 0, 7)
-		min         = util.GetStartOfWeek(firstTask.StartedAt)
-		weeklyHours = app.GetConfig().WeeklyHours
-		delta       time.Duration
+		max   = util.GetStartOfWeek(time.Now()).AddDate(0, 0, 7)
+		min   = util.GetStartOfWeek(firstTask.StartedAt)
+		delta time.Duration
 	)
 
 	for cur := min; cur.Before(max); cur = cur.AddDate(0, 0, 7) {
@@ -30,7 +29,7 @@ func report(app *tt.TT, out output) error {
 			return err
 		}
 
-		delta += r.Total - weeklyHours
+		delta += r.Overtime
 		printWeeklyReport(app, out, r, delta)
 
 		fmt.Fprint(out.w, "\n")
@@ -116,7 +115,6 @@ func printWeeklyReport(app *tt.TT, out output, r tt.WeeklyReport, runningDelta t
 	b.WriteRune('\n')
 
 	if weeklyHours > 0 {
-		var totalOvertime time.Duration
 		// Daily over/under time
 		for i := 0; i < showDays; i++ {
 			dr, ok := dailyReport(i)
@@ -126,11 +124,10 @@ func printWeeklyReport(app *tt.TT, out output, r tt.WeeklyReport, runningDelta t
 			}
 
 			delta := dr.Total - (weeklyHours / 5)
-			totalOvertime += delta
 			fmt.Fprintf(&b, " %s ", util.FormatSignedFixedDuration(delta))
 		}
 
-		fmt.Fprintf(&b, " %s ", util.FormatSignedFixedDuration(totalOvertime))
+		fmt.Fprintf(&b, " %s ", util.FormatSignedFixedDuration(r.Overtime))
 		fmt.Fprintf(&b, " (%s)", util.FormatSignedFixedDuration(runningDelta))
 
 		b.WriteRune('\n')
