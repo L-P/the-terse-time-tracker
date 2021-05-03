@@ -96,27 +96,36 @@ func (c currentTaskOutput) String() string {
 }
 
 func writeTimeLeft(w io.Writer, daily, weekly time.Duration) {
+	now := time.Now()
+	at := func(d time.Duration) string {
+		return now.Add(d).Format("15:04:05")
+	}
+
 	switch {
 	case daily > 0 && weekly > 0:
 		fmt.Fprintf(
 			w,
-			t("%s left today, %s left before weekly overtime.\n"),
+			t("%s left today (%s), %s left before weekly overtime (%s).\n"),
 			util.FormatDuration(daily),
+			at(daily),
 			util.FormatDuration(weekly),
+			at(weekly),
 		)
 	case daily > 0 && weekly <= 0:
 		fmt.Fprintf(
 			w,
-			t("%s left today, currently %s of weekly overtime.\n"),
+			t("%s left today (%s), currently %s of weekly overtime.\n"),
 			util.FormatDuration(daily),
+			at(daily),
 			util.FormatDuration(-weekly),
 		)
 	case daily <= 0 && weekly > 0:
 		fmt.Fprintf(
 			w,
-			t("%s overtime, %s left before weekly overtime.\n"),
+			t("%s overtime, %s left before weekly overtime (%s).\n"),
 			util.FormatDuration(-daily),
 			util.FormatDuration(weekly),
+			at(weekly),
 		)
 	case daily <= 0 && weekly <= 0:
 		fmt.Fprintf(
