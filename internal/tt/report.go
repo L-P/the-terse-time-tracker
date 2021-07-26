@@ -36,7 +36,12 @@ func (tt *TT) GetWeeklyReport(t time.Time) (WeeklyReport, error) {
 
 			start, end, err := tt.getWorkedHoursBounds(tx, dayStart)
 			if err == nil {
-				report.Overtime += agg - (weeklyHours / 5)
+				if isOffDay(dayStart.Weekday()) {
+					report.Overtime += agg
+				} else {
+					report.Overtime += agg - (weeklyHours / 5)
+				}
+
 				report.Total += agg
 				report.Daily[dayStart.Weekday()] = DailyReport{
 					Start: start,
@@ -54,4 +59,10 @@ func (tt *TT) GetWeeklyReport(t time.Time) (WeeklyReport, error) {
 	}
 
 	return report, nil
+}
+
+// TODO: take full range as input and output overtime depending on weekday and
+// public holidays.
+func isOffDay(wd time.Weekday) bool {
+	return wd == time.Saturday || wd == time.Sunday
 }
