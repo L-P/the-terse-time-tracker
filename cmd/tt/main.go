@@ -57,6 +57,10 @@ func run(args []string, out io.Writer) error {
 var errConfigDir = errors.New(t("unable to fetch config dir"))
 
 func getDBPath() (string, error) {
+	if path := os.Getenv("TT_DB_PATH"); path != "" {
+		return path, nil
+	}
+
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", errConfigDir
