@@ -37,7 +37,7 @@ func (tt *TT) GetWeeklyReport(t time.Time) (WeeklyReport, error) {
 			start, end, err := tt.getWorkedHoursBounds(tx, dayStart)
 			if err == nil {
 				if isOffDay(dayStart.Weekday()) {
-					report.Overtime += agg
+					report.Overtime += 2 * agg
 				} else {
 					report.Overtime += agg - (weeklyHours / 5)
 				}
