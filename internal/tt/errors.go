@@ -12,12 +12,12 @@ var ErrInvalidTaskDesc = errors.New("invalid task description")
 var ErrNotConfigured = errors.New("missing configuration for this feature")
 var ErrNoTasks = errors.New("no tasks are present in the specified range")
 
-type ErrIO struct {
+type IOError struct {
 	msg, path string
 	wrapped   error
 }
 
-func (e ErrIO) Error() string {
+func (e IOError) Error() string {
 	if e.wrapped != nil {
 		return fmt.Sprintf("I/O error: %s (%s): %s", e.msg, e.path, e.wrapped)
 	}
@@ -25,25 +25,25 @@ func (e ErrIO) Error() string {
 	return fmt.Sprintf("I/O error: %s (%s)", e.msg, e.path)
 }
 
-type ErrBadQuery struct {
+type BadQueryError struct {
 	wrapped error
 	query   string
 	params  []interface{}
 }
 
-func (e ErrBadQuery) Error() string {
+func (e BadQueryError) Error() string {
 	return fmt.Sprintf("bad query: %s\n%s", e.wrapped, e.query)
 }
 
 type (
-	ErrInvalidInput string // user provided invalid data
-	ErrDatabase     string // database driver error
-	ErrRuntime      string // generic runtime error
-	ErrExitCode     int    // normal error that needs to bubble up to the shell
+	InvalidInputError string // user provided invalid data
+	DatabaseError     string // database driver error
+	RuntimeError      string // generic runtime error
+	ExitCodeError     int    // normal error that needs to bubble up to the shell
 )
 
-func (e ErrInvalidInput) Error() string { return string(e) }
-func (e ErrDatabase) Error() string     { return string(e) }
-func (e ErrRuntime) Error() string      { return string(e) }
-func (e ErrExitCode) Error() string     { return fmt.Sprintf("exit code %d", e.Code()) }
-func (e ErrExitCode) Code() int         { return int(e) }
+func (e InvalidInputError) Error() string { return string(e) }
+func (e DatabaseError) Error() string     { return string(e) }
+func (e RuntimeError) Error() string      { return string(e) }
+func (e ExitCodeError) Error() string     { return fmt.Sprintf("exit code %d", e.Code()) }
+func (e ExitCodeError) Code() int         { return int(e) }

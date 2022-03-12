@@ -48,6 +48,7 @@ func testBasicsStopTask(t *testing.T, app *tt.TT) {
 	}
 }
 
+// nolint: cyclop
 func testBasicsCorrectedTask(t *testing.T, app *tt.TT) {
 	// No change
 	prev, next, err := app.Start("desc @tag")

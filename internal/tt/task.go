@@ -130,7 +130,7 @@ func queryTasks(tx *sql.Tx, query string, params ...interface{}) ([]Task, error)
 			return nil, nil
 		}
 
-		return nil, ErrBadQuery{err, query, nil}
+		return nil, BadQueryError{err, query, nil}
 	}
 	defer rows.Close()
 
@@ -138,7 +138,7 @@ func queryTasks(tx *sql.Tx, query string, params ...interface{}) ([]Task, error)
 	for rows.Next() {
 		var proxy taskProxy
 		if err := proxy.scan(rows); err != nil {
-			return nil, ErrBadQuery{err, query, nil}
+			return nil, BadQueryError{err, query, nil}
 		}
 
 		task, err := proxy.Task()
@@ -150,7 +150,7 @@ func queryTasks(tx *sql.Tx, query string, params ...interface{}) ([]Task, error)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, ErrBadQuery{err, query, nil}
+		return nil, BadQueryError{err, query, nil}
 	}
 
 	return ret, nil
@@ -165,10 +165,10 @@ func getCurrentTask(tx *sql.Tx) (*Task, error) {
 	)
 	if err := proxy.scan(tx.QueryRow(query)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, ErrNoCurrentTask
 		}
 
-		return nil, ErrBadQuery{err, query, nil}
+		return nil, BadQueryError{err, query, nil}
 	}
 
 	return proxy.Task()

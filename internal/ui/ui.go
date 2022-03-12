@@ -76,6 +76,7 @@ func New(tt *tt.TT) *UI {
 }
 
 func (ui *UI) Run() error {
+	// nolint:wrapcheck
 	return ui.app.Run()
 }
 

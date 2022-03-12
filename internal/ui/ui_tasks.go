@@ -103,14 +103,14 @@ func (ui *UI) getTaskFormTask() (tt.Task, error) {
 	location := time.Now().Location()
 	startedAt, err := time.ParseInLocation(formDateTimeFormat, value(taskFormFieldIndexStartedAt), location)
 	if err != nil {
-		return tt.Task{}, tt.ErrInvalidInput(err.Error())
+		return tt.Task{}, tt.InvalidInputError(err.Error())
 	}
 
 	var stoppedAt time.Time
 	if str := value(taskFormFieldIndexStoppedAt); str != "" {
 		stoppedAt, err = time.ParseInLocation(formDateTimeFormat, str, location)
 		if err != nil {
-			return tt.Task{}, tt.ErrInvalidInput(err.Error())
+			return tt.Task{}, tt.InvalidInputError(err.Error())
 		}
 	}
 
@@ -168,6 +168,7 @@ func (ui *UI) deleteSelectedTask() {
 		return
 	}
 
+	// nolint: gocritic // on purpose, temp representation
 	tasks := append(ui.tasks[:ui.selectedTaskIndex], ui.tasks[ui.selectedTaskIndex+1:]...)
 
 	// TODO: starts to feel sluggish after 100k tasks, but RemoveRow incurs

@@ -139,7 +139,7 @@ func writeTimeLeft(w io.Writer, daily, weekly time.Duration) {
 
 func showCurrent(app *tt.TT, out output) error {
 	cur, err := app.CurrentTask()
-	if err != nil {
+	if err != nil && !errors.Is(err, tt.ErrNoCurrentTask) {
 		return err
 	}
 
@@ -148,7 +148,7 @@ func showCurrent(app *tt.TT, out output) error {
 		formatter = currentTaskOutput{Task: cur}
 	)
 	if cur == nil {
-		ret = tt.ErrExitCode(1)
+		ret = tt.ExitCodeError(1)
 	}
 
 	if daily, weekly, err := app.GetDurationLeft(); err == nil {
@@ -170,6 +170,7 @@ func showCurrent(app *tt.TT, out output) error {
 	return ret
 }
 
+// nolint: cyclop // looks ok to me
 func start(app *tt.TT, args []string, out output) error {
 	prev, next, err := app.Start(strings.Join(args, " "))
 	if err != nil {

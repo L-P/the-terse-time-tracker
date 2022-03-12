@@ -25,6 +25,7 @@ func taskProxyFields() string {
 }
 
 func (t *taskProxy) scan(s scannable) error {
+	// nolint:wrapcheck // proxy func
 	return s.Scan(
 		&t.ID,
 		&t.Description,
@@ -40,7 +41,7 @@ func newProxyFromTask(t Task) (taskProxy, error) {
 		var err error
 		tags, err = json.Marshal(t.Tags)
 		if err != nil {
-			return taskProxy{}, ErrRuntime(fmt.Sprintf("unable to encode tags: %s", err))
+			return taskProxy{}, RuntimeError(fmt.Sprintf("unable to encode tags: %s", err))
 		}
 	}
 
@@ -62,7 +63,7 @@ func (t taskProxy) Task() (*Task, error) {
 	}
 
 	if err := json.Unmarshal(t.Tags, &ret.Tags); err != nil {
-		return nil, ErrRuntime(fmt.Sprintf("unable to parse tags array: %s", err))
+		return nil, RuntimeError(fmt.Sprintf("unable to parse tags array: %s", err))
 	}
 
 	return &ret, nil

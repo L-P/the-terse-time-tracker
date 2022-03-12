@@ -1,4 +1,4 @@
-// nolint:wrapcheck
+// nolint:wrapcheck,cyclop // For some reason func-local cyclop did nothing.
 package main
 
 import (

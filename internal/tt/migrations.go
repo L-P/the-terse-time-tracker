@@ -8,7 +8,7 @@ import (
 func migrate(db *sql.DB) (err error) {
 	cur := getCurrentMigrationVersion(db)
 	if cur < 0 {
-		return ErrDatabase(fmt.Sprintf("invalid database version: %d", cur))
+		return DatabaseError(fmt.Sprintf("invalid database version: %d", cur))
 	}
 
 	switch cur {
@@ -18,7 +18,7 @@ func migrate(db *sql.DB) (err error) {
 	case 1:
 		break // current version
 	default:
-		return ErrDatabase(fmt.Sprintf("database is at version %d which is not compatible with your local tt version", cur))
+		return DatabaseError(fmt.Sprintf("database is at version %d which is not compatible with your local tt version", cur))
 	}
 
 	return err
@@ -60,7 +60,7 @@ func doInitialMigration(db *sql.DB) error {
 	for k := range queries {
 		_, err := db.Exec(queries[k])
 		if err != nil {
-			return ErrBadQuery{err, queries[k], nil}
+			return BadQueryError{err, queries[k], nil}
 		}
 	}
 

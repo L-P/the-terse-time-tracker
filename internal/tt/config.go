@@ -14,10 +14,10 @@ type Config struct {
 
 func (c Config) Validate() error {
 	if c.WeeklyHours < 0 {
-		return ErrInvalidInput("WeeklyHours cannot be negative")
+		return InvalidInputError("WeeklyHours cannot be negative")
 	}
 	if c.WeeklyHours > (7 * 24 * time.Hour) {
-		return ErrInvalidInput("WeeklyHours must fit in a week")
+		return InvalidInputError("WeeklyHours must fit in a week")
 	}
 
 	return nil
@@ -60,7 +60,7 @@ func loadConfig(db *sql.DB) (Config, error) {
 			return Config{}, nil
 		}
 
-		return Config{}, ErrBadQuery{err, query, nil}
+		return Config{}, BadQueryError{err, query, nil}
 	}
 	defer rows.Close()
 
@@ -68,12 +68,12 @@ func loadConfig(db *sql.DB) (Config, error) {
 
 	for rows.Next() {
 		if err := c.scan(rows); err != nil {
-			return Config{}, ErrBadQuery{err, query, nil}
+			return Config{}, BadQueryError{err, query, nil}
 		}
 	}
 
 	if err := rows.Err(); err != nil {
-		return Config{}, ErrBadQuery{err, query, nil}
+		return Config{}, BadQueryError{err, query, nil}
 	}
 
 	return c, nil

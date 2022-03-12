@@ -1,4 +1,4 @@
-//+build !fixture
+//go:build !fixture
 
 package tt
 

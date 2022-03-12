@@ -18,14 +18,14 @@ var Version = "unknown"
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
-		var inputError tt.ErrInvalidInput
+		var inputError tt.InvalidInputError
 		if errors.As(err, &inputError) {
 			fmt.Fprintf(os.Stderr, "error: %s\n", err)
 			flag.Usage()
 			os.Exit(1)
 		}
 
-		var exitCode tt.ErrExitCode
+		var exitCode tt.ExitCodeError
 		if errors.As(err, &exitCode) {
 			os.Exit(exitCode.Code())
 		}

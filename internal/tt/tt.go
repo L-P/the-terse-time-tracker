@@ -2,6 +2,7 @@ package tt
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -21,16 +22,16 @@ type TT struct {
 func New(dsn string) (*TT, error) {
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
-		return nil, ErrIO{"unable to open database", dsn, err}
+		return nil, IOError{"unable to open database", dsn, err}
 	}
 
 	if err := migrate(db); err != nil {
-		return nil, ErrIO{"unable to migrate DB", dsn, err}
+		return nil, IOError{"unable to migrate DB", dsn, err}
 	}
 
 	config, err := loadConfig(db)
 	if err != nil {
-		return nil, ErrRuntime(fmt.Sprintf("unable to load config: %s", err))
+		return nil, RuntimeError(fmt.Sprintf("unable to load config: %s", err))
 	}
 
 	return &TT{
@@ -40,20 +41,25 @@ func New(dsn string) (*TT, error) {
 }
 
 func (tt *TT) Close() error {
-	return tt.db.Close()
+	if err := tt.db.Close(); err != nil {
+		return fmt.Errorf("unable to close DB: %w", err)
+	}
+
+	return nil
 }
 
 // Start can start a new task and stop the current one, update a current task,
 // or do nothing.
 // It returns the current task (if any) and next task (always). If the task is
 // the same, the data might differ.
+// nolint:cyclop,gocognit // might be TODO
 func (tt *TT) Start(raw string) (*Task, *Task, error) {
 	desc, tags := ParseRawDesc(raw)
 	var current, next *Task
 
 	err := tt.transaction(func(tx *sql.Tx) (err error) {
 		current, err = getCurrentTask(tx)
-		if err != nil {
+		if err != nil && !errors.Is(err, ErrNoCurrentTask) {
 			return err
 		}
 
@@ -107,10 +113,6 @@ func (tt *TT) Stop() (*Task, error) {
 		cur, err = getCurrentTask(tx)
 		if err != nil {
 			return err
-		}
-
-		if cur == nil {
-			return ErrNoCurrentTask
 		}
 
 		cur.StoppedAt = time.Now()
@@ -194,11 +196,7 @@ func (tt *TT) CurrentTask() (*Task, error) {
 
 	if err := tt.transaction(func(tx *sql.Tx) (err error) {
 		cur, err = getCurrentTask(tx)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 	}); err != nil {
 		return nil, err
 	}
