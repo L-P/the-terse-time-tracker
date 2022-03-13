@@ -1,10 +1,8 @@
-// nolint:wrapcheck,cyclop // For some reason func-local cyclop did nothing.
 package main
 
 import (
 	"fmt"
 	"strings"
-	"time"
 	"tt/internal/tt"
 	"tt/internal/util"
 )
@@ -12,28 +10,29 @@ import (
 const dateFormat = "2006-01-02"
 
 func report(app *tt.TT, out output) error {
-	firstTask, err := app.GetFirstTask()
+	report, err := app.GetReport()
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to generate report: %w", err)
 	}
 
 	var (
-		max   = util.GetStartOfWeek(time.Now()).AddDate(0, 0, 7)
-		min   = util.GetStartOfWeek(firstTask.StartedAt)
-		delta time.Duration
+		total       tt.ReportEntry
+		weekly      tt.Report
+		_, lastWeek = report.Accumulated.Day.ISOWeek()
 	)
 
-	for cur := min; cur.Before(max); cur = cur.AddDate(0, 0, 7) {
-		r, err := app.GetWeeklyReport(cur)
-		if err != nil {
-			return err
+	for _, daily := range report.Daily {
+		if _, curWeek := daily.Day.ISOWeek(); curWeek != lastWeek {
+			lastWeek = curWeek
+			printWeeklyReport(out, weekly, total)
+			weekly = tt.Report{}
 		}
 
-		delta += r.Overtime
-		printWeeklyReport(app, out, r, delta)
-
-		fmt.Fprint(out.w, "\n")
+		weekly.Add(daily)
+		total.Add(daily)
 	}
+
+	printWeeklyReport(out, weekly, total)
 
 	return nil
 }
@@ -47,93 +46,94 @@ func report(app *tt.TT, out output) error {
 //  07h48m   07h48m   07h48m   07h48m   07h48m   39h00m
 // +01h20m  +00h00m  +00h00m  +00h00m  +00h00m  +00h00m (+00h00m)
 //   Mon.     Tue.     Wed.     Thu.     Fri.    Total
-func printWeeklyReport(app *tt.TT, out output, r tt.WeeklyReport, runningDelta time.Duration) {
+func printWeeklyReport(out output, r tt.Report, total tt.ReportEntry) {
 	var (
-		b           strings.Builder
-		showDays    = 5 // show only worked days
-		startOffset = 1 // start on monday (offset on time.Weekday)
-		weeklyHours = app.GetConfig().WeeklyHours
-		blank       = "         "
-		_, isoWeek  = r.Start.ISOWeek()
+		b          strings.Builder
+		showDays   = 7
+		blank      = "         "
+		_, isoWeek = r.Accumulated.Day.ISOWeek()
 	)
 
 	fmt.Fprintf(&b,
 		"Week #%d from %s to %s\n",
 		isoWeek,
-		r.Start.Format(dateFormat),
-		r.End.AddDate(0, 0, -1).Format(dateFormat),
+		r.Accumulated.Day.Format(dateFormat),
+		r.Accumulated.Day.AddDate(0, 0, 6).Format(dateFormat),
 	)
 
-	if r.Total == 0 {
-		b.WriteString("No work done this week.\n")
+	if r.Accumulated.WorkDuration == 0 {
+		b.WriteString("No work done this week.\n\n")
 		fmt.Fprint(out.w, b.String())
 		return
 	}
 
-	dailyReport := func(i int) (tt.DailyReport, bool) {
-		// start on monday
-		dr := r.Daily[(i+startOffset)%len(r.Daily)]
-		return dr, dr.Total != 0
+	var dailyReport [7]tt.ReportEntry
+	for _, v := range r.Daily {
+		dailyReport[(v.Day.Weekday()+6)%7] = v
 	}
 
 	b.Grow(300) // a little over expected exact length
 
 	// Start hour
 	for i := 0; i < showDays; i++ {
-		dr, ok := dailyReport(i)
-		if !ok {
+		dr := dailyReport[i]
+		if dr.WorkDuration <= 0 {
 			b.WriteString(blank)
 			continue
 		}
 
-		fmt.Fprintf(&b, "  %s  ", dr.Start.Format("15:04"))
+		fmt.Fprintf(&b, "  %s  ", dr.WorkStart.Format("15:04"))
 	}
 	b.WriteRune('\n')
 
 	// End hour
 	for i := 0; i < showDays; i++ {
-		dr, ok := dailyReport(i)
-		if !ok {
+		dr := dailyReport[i]
+		if dr.WorkDuration <= 0 {
 			b.WriteString(blank)
 			continue
 		}
 
-		fmt.Fprintf(&b, "  %s  ", dr.End.Format("15:04"))
+		fmt.Fprintf(&b, "  %s  ", dr.WorkEnd.Format("15:04"))
 	}
 	b.WriteRune('\n')
 
 	// Duration
 	for i := 0; i < showDays; i++ {
-		dr, ok := dailyReport(i)
-		if !ok {
+		dr := dailyReport[i]
+		if dr.WorkDuration <= 0 {
 			b.WriteString(blank)
 			continue
 		}
 
-		fmt.Fprintf(&b, "  %s ", util.FormatFixedDuration(dr.Total))
+		fmt.Fprintf(&b, "  %s ", util.FormatFixedDuration(dr.WorkDuration))
 	}
 	b.WriteRune('\n')
 
-	if weeklyHours > 0 {
-		// Daily over/under time
-		for i := 0; i < showDays; i++ {
-			dr, ok := dailyReport(i)
-			if !ok {
-				b.WriteString(blank)
-				continue
-			}
-
-			delta := dr.Total - (weeklyHours / 5)
-			fmt.Fprintf(&b, " %s ", util.FormatSignedFixedDuration(delta))
+	// Daily over/under time
+	for i := 0; i < showDays; i++ {
+		dr := dailyReport[i]
+		over := dr.Overtime + dr.InLieu
+		switch {
+		case over > 0:
+			fmt.Fprintf(&b, " %s ", util.FormatSignedFixedDuration(over))
+		case dr.Taken > 0:
+			fmt.Fprintf(&b, " %s ", util.FormatSignedFixedDuration(-dr.Taken))
+		default:
+			b.WriteString(blank)
+			continue
 		}
-
-		fmt.Fprintf(&b, " %s ", util.FormatSignedFixedDuration(r.Overtime))
-		fmt.Fprintf(&b, " (%s)", util.FormatSignedFixedDuration(runningDelta))
-
-		b.WriteRune('\n')
 	}
 
-	// HARDCODED, will shift if startOffset changes.
-	b.WriteString("   Mon.     Tue.     Wed.     Thu.     Fri.    Total\n")
+	weeklyTimeSum := (r.Accumulated.Overtime + r.Accumulated.InLieu) - r.Accumulated.Taken
+	totalTimeSum := (total.Overtime + total.InLieu) - total.Taken
+
+	fmt.Fprintf(&b, " %s ", util.FormatSignedFixedDuration(weeklyTimeSum))
+	fmt.Fprintf(&b, " (%s)", util.FormatSignedFixedDuration(totalTimeSum))
+
+	b.WriteRune('\n')
+
+	b.WriteString("   Mon.     Tue.     Wed.     Thu.     Fri.     Sat.     Sun.    Total\n\n")
+
 	fmt.Fprint(out.w, b.String())
 }

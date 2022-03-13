@@ -16,6 +16,16 @@ type Task struct {
 	StoppedAt   time.Time // will be a zero time for the task in progress
 }
 
+func (t *Task) HasTag(tag string) bool {
+	for _, v := range t.Tags {
+		if v == tag {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (t *Task) IsStopped() bool {
 	return !t.StoppedAt.IsZero()
 }
@@ -88,24 +98,28 @@ func getAllTasks(tx *sql.Tx) ([]Task, error) {
 	))
 }
 
-func (tt *TT) GetFirstTask() (Task, error) {
+func (tt *TT) wrapTaskQuery(cb func(tx *sql.Tx) ([]Task, error)) ([]Task, error) {
 	var tasks []Task
 
 	if err := tt.transaction(func(tx *sql.Tx) (err error) {
-		tasks, err = queryTasks(tx, fmt.Sprintf(
-			`SELECT %s FROM Task ORDER BY StartedAt ASC LIMIT 1`,
-			taskProxyFields(),
-		))
+		tasks, err = cb(tx)
 		return err
 	}); err != nil {
-		return Task{}, err
+		return nil, err
 	}
 
 	if len(tasks) == 0 {
-		return Task{}, ErrNoTasks
+		return nil, ErrNoTasks
 	}
 
-	return tasks[0], nil
+	return tasks, nil
+}
+
+func getFirstTask(tx *sql.Tx) ([]Task, error) {
+	return queryTasks(tx, fmt.Sprintf(
+		`SELECT %s FROM Task ORDER BY StartedAt ASC LIMIT 1`,
+		taskProxyFields(),
+	))
 }
 
 func getTasksInRange(tx *sql.Tx, startTime, endTime time.Time) ([]Task, error) {
@@ -116,7 +130,7 @@ func getTasksInRange(tx *sql.Tx, startTime, endTime time.Time) ([]Task, error) {
         WHERE (StartedAt >= ? AND StartedAt < ?)
            OR (StoppedAt > ? AND StoppedAt < ?)
            OR (StartedAt >= ? AND StartedAt < ? AND StoppedAt IS NULL)
-        ORDER BY StartedAt DESC`,
+        ORDER BY StartedAt ASC`,
 		taskProxyFields(),
 	)
 

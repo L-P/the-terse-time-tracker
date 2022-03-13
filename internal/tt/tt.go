@@ -165,20 +165,7 @@ func ParseRawDesc(raw string) (string, []string) {
 }
 
 func (tt *TT) GetTasks() ([]Task, error) {
-	var ret []Task
-
-	if err := tt.transaction(func(tx *sql.Tx) (err error) {
-		ret, err = getAllTasks(tx)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
+	return tt.wrapTaskQuery(getAllTasks)
 }
 
 func (tt *TT) DeleteTask(taskID int64) error {
@@ -275,30 +262,11 @@ func (tt *TT) getAggregatedTime(tx *sql.Tx, start, end time.Time) (time.Duration
 	return acc, nil
 }
 
-func (tt *TT) getWorkedHoursBounds(tx *sql.Tx, t time.Time) (time.Time, time.Time, error) {
-	dayStart := util.GetStartOfDay(t)
-	dayEnd := dayStart.AddDate(0, 0, 1)
-
-	tasks, err := getTasksInRange(tx, dayStart, dayEnd)
+func (tt *TT) GetFirstTask() (Task, error) {
+	tasks, err := tt.wrapTaskQuery(getFirstTask)
 	if err != nil {
-		return time.Time{}, time.Time{}, err
+		return Task{}, err
 	}
 
-	if len(tasks) == 0 {
-		return time.Time{}, time.Time{}, ErrNoTasks
-	}
-
-	start := tasks[len(tasks)-1].StartedAt
-	end := tasks[0].StoppedAt
-
-	if start.Before(dayStart) {
-		start = dayStart
-	}
-	if end.After(dayEnd) {
-		end = dayEnd
-	} else if end.IsZero() {
-		end = time.Now()
-	}
-
-	return start, end, nil
+	return tasks[0], nil // wrapTaskQuery errors out if no task found we have at least one
 }
