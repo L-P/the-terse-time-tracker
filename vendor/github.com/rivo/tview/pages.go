@@ -12,9 +12,9 @@ type page struct {
 	Visible bool      // Whether or not this page is visible.
 }
 
-// Pages is a container for other primitives often used as the application's
-// root primitive. It allows to easily switch the visibility of the contained
-// primitives.
+// Pages is a container for other primitives laid out on top of each other,
+// overlapping or not. It is often used as the application's root primitive. It
+// allows to easily switch the visibility of the contained primitives.
 //
 // See https://github.com/rivo/tview/wiki/Pages for an example.
 type Pages struct {
@@ -243,7 +243,7 @@ func (p *Pages) HasFocus() bool {
 			return true
 		}
 	}
-	return false
+	return p.Box.HasFocus()
 }
 
 // Focus is called by the application when the primitive receives focus.
@@ -260,6 +260,8 @@ func (p *Pages) Focus(delegate func(p Primitive)) {
 	}
 	if topItem != nil {
 		delegate(topItem)
+	} else {
+		p.Box.Focus(delegate)
 	}
 }
 

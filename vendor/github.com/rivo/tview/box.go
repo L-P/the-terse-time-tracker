@@ -26,6 +26,9 @@ type Box struct {
 	// The box's background color.
 	backgroundColor tcell.Color
 
+	// If set to true, the background of this box is not cleared while drawing.
+	dontClear bool
+
 	// Whether or not a border is drawn, reducing the box's space for content by
 	// two in width and height.
 	border bool
@@ -42,8 +45,14 @@ type Box struct {
 	// The alignment of the title.
 	titleAlign int
 
-	// Whether or not this box has focus.
+	// Whether or not this box has focus. This is typically ignored for
+	// container primitives (e.g. Flex, Grid, Pages), as they will delegate
+	// focus to their children.
 	hasFocus bool
+
+	// Optional callback functions invoked when the primitive receives or loses
+	// focus.
+	focus, blur func()
 
 	// An optional capture function which receives a key event and returns the
 	// event to be forwarded to the primitive's default input handler (nil if
@@ -66,7 +75,7 @@ func NewBox() *Box {
 		height:          10,
 		innerX:          -1, // Mark as uninitialized.
 		backgroundColor: Styles.PrimitiveBackgroundColor,
-		borderStyle:     tcell.StyleDefault.Foreground(Styles.BorderColor),
+		borderStyle:     tcell.StyleDefault.Foreground(Styles.BorderColor).Background(Styles.PrimitiveBackgroundColor),
 		titleColor:      Styles.TitleColor,
 		titleAlign:      AlignCenter,
 	}
@@ -173,12 +182,8 @@ func (b *Box) InputHandler() func(event *tcell.EventKey, setFocus func(p Primiti
 //
 // Providing a nil handler will remove a previously existing handler.
 //
-// Note that this function will not have an effect on primitives composed of
-// other primitives, such as Form, Flex, or Grid. Key events are only captured
-// by the primitives that have focus (e.g. InputField) and only one primitive
-// can have focus at a time. Composing primitives such as Form pass the focus on
-// to their contained primitives and thus never receive any key events
-// themselves. Therefore, they cannot intercept key events.
+// This function can also be used on container primitives (like Flex, Grid, or
+// Form) as keyboard events will be handed down until they are handled.
 func (b *Box) SetInputCapture(capture func(event *tcell.EventKey) *tcell.EventKey) *Box {
 	b.inputCapture = capture
 	return b
@@ -247,6 +252,7 @@ func (b *Box) GetMouseCapture() func(action MouseAction, event *tcell.EventMouse
 // SetBackgroundColor sets the box's background color.
 func (b *Box) SetBackgroundColor(color tcell.Color) *Box {
 	b.backgroundColor = color
+	b.borderStyle = b.borderStyle.Background(color)
 	return b
 }
 
@@ -334,7 +340,7 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 
 	// Fill background.
 	background := def.Background(b.backgroundColor)
-	if b.backgroundColor != tcell.ColorDefault {
+	if !b.dontClear {
 		for y := b.y; y < b.y+b.height; y++ {
 			for x := b.x; x < b.x+b.width; x++ {
 				screen.SetContent(x, y, ' ', nil, background)
@@ -394,13 +400,39 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 	}
 }
 
+// SetFocusFunc sets a callback function which is invoked when this primitive
+// receives focus. Container primitives such as Flex or Grid may not be notified
+// if one of their descendents receive focus directly.
+//
+// Set to nil to remove the callback function.
+func (b *Box) SetFocusFunc(callback func()) *Box {
+	b.focus = callback
+	return b
+}
+
+// SetBlurFunc sets a callback function which is invoked when this primitive
+// loses focus. This does not apply to container primitives such as Flex or
+// Grid.
+//
+// Set to nil to remove the callback function.
+func (b *Box) SetBlurFunc(callback func()) *Box {
+	b.blur = callback
+	return b
+}
+
 // Focus is called when this primitive receives focus.
 func (b *Box) Focus(delegate func(p Primitive)) {
 	b.hasFocus = true
+	if b.focus != nil {
+		b.focus()
+	}
 }
 
 // Blur is called when this primitive loses focus.
 func (b *Box) Blur() {
+	if b.blur != nil {
+		b.blur()
+	}
 	b.hasFocus = false
 }
 

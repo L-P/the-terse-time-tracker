@@ -23,12 +23,11 @@ var (
 	TabSize = 4
 )
 
-// textViewIndex contains information about each line displayed in the text
-// view.
+// textViewIndex contains information about a line displayed in the text view.
 type textViewIndex struct {
-	Line            int    // The index into the "buffer" variable.
+	Line            int    // The index into the "buffer" slice.
 	Pos             int    // The index into the "buffer" string (byte position).
-	NextPos         int    // The (byte) index of the next character in this buffer line.
+	NextPos         int    // The (byte) index of the next line start within this buffer string.
 	Width           int    // The screen width of this line.
 	ForegroundColor string // The starting foreground color ("" = don't change, "-" = reset).
 	BackgroundColor string // The starting background color ("" = don't change, "-" = reset).
@@ -44,6 +43,36 @@ type textViewRegion struct {
 	// The starting and end screen position of the region as determined the last
 	// time Draw() was called. A negative value indicates out-of-rect positions.
 	FromX, FromY, ToX, ToY int
+}
+
+// TextViewWriter is a writer that can be used to write to and clear a TextView
+// in batches, i.e. multiple writes with the lock only being aquired once. Don't
+// instantiated this class directly but use the TextView's BatchWriter method
+// instead.
+type TextViewWriter struct {
+	t *TextView
+}
+
+// Close implements io.Closer for the writer by unlocking the original TextView.
+func (w TextViewWriter) Close() error {
+	w.t.Unlock()
+	return nil
+}
+
+// Clear removes all text from the buffer.
+func (w TextViewWriter) Clear() {
+	w.t.clear()
+}
+
+// Write implements the io.Writer interface. It behaves like the TextView's
+// Write() method except that it does not aquire the lock.
+func (w TextViewWriter) Write(p []byte) (n int, err error) {
+	return w.t.write(p)
+}
+
+// HasFocus returns whether the underlying TextView has focus.
+func (w TextViewWriter) HasFocus() bool {
+	return w.t.hasFocus
 }
 
 // TextView is a box which displays text. It implements the io.Writer interface
@@ -98,6 +127,13 @@ type textViewRegion struct {
 // The ScrollToHighlight() function can be used to jump to the currently
 // highlighted region once when the text view is drawn the next time.
 //
+// Large Texts
+//
+// This widget is not designed for very large texts as word wrapping, color and
+// region tag handling, and proper Unicode handling will result in a significant
+// performance hit the longer your text gets. Consider using SetMaxLines() to
+// limit the number of lines in the text view.
+//
 // See https://github.com/rivo/tview/wiki/TextView for an example.
 type TextView struct {
 	sync.Mutex
@@ -131,7 +167,7 @@ type TextView struct {
 	// A set of region IDs that are currently highlighted.
 	highlights map[string]struct{}
 
-	// The last width for which the current table is drawn.
+	// The last width for which the current text view is drawn.
 	lastWidth int
 
 	// The screen width of the longest line in the index (not the buffer).
@@ -145,6 +181,10 @@ type TextView struct {
 
 	// The number of characters to be skipped on each line (not in wrap mode).
 	columnOffset int
+
+	// The maximum number of lines kept in the line index, effectively the
+	// latest word-wrapped lines. Ignored if 0.
+	maxLines int
 
 	// The height of the content the last time the text view was drawn.
 	pageSize int
@@ -243,6 +283,20 @@ func (t *TextView) SetWordWrap(wrapOnWords bool) *TextView {
 	return t
 }
 
+// SetMaxLines sets the maximum number of lines for this text view. Lines at the
+// beginning of the text will be discarded when the text view is drawn, so as to
+// remain below this value. Broken lines via word wrapping are counted
+// individually.
+//
+// Note that GetText() will return the shortened text and may start with color
+// and/or region tags that were open at the cutoff point.
+//
+// A value of 0 (the default) will keep all lines in place.
+func (t *TextView) SetMaxLines(maxLines int) *TextView {
+	t.maxLines = maxLines
+	return t
+}
+
 // SetTextAlign sets the text alignment within the text view. This must be
 // either AlignLeft, AlignCenter, or AlignRight.
 func (t *TextView) SetTextAlign(align int) *TextView {
@@ -264,8 +318,11 @@ func (t *TextView) SetTextColor(color tcell.Color) *TextView {
 // SetText sets the text of this text view to the provided string. Previously
 // contained text will be removed.
 func (t *TextView) SetText(text string) *TextView {
-	t.Clear()
-	fmt.Fprint(t, text)
+	batch := t.BatchWriter()
+	defer batch.Close()
+
+	batch.Clear()
+	fmt.Fprint(batch, text)
 	return t
 }
 
@@ -273,9 +330,10 @@ func (t *TextView) SetText(text string) *TextView {
 // to true, any region/color tags are stripped from the text.
 func (t *TextView) GetText(stripAllTags bool) string {
 	// Get the buffer.
-	buffer := make([]string, len(t.buffer), len(t.buffer)+1)
-	copy(buffer, t.buffer)
+	buffer := t.buffer
 	if !stripAllTags {
+		buffer = make([]string, len(t.buffer), len(t.buffer)+1)
+		copy(buffer, t.buffer)
 		buffer = append(buffer, string(t.recentBytes))
 	}
 
@@ -296,6 +354,12 @@ func (t *TextView) GetText(stripAllTags bool) string {
 	}
 
 	return text
+}
+
+// GetOriginalLineCount returns the number of lines in the original text buffer,
+// i.e. the number of newline characters plus one.
+func (t *TextView) GetOriginalLineCount() int {
+	return len(t.buffer)
 }
 
 // SetDynamicColors sets the flag that allows the text color to be changed
@@ -402,10 +466,19 @@ func (t *TextView) GetScrollOffset() (row, column int) {
 
 // Clear removes all text from the buffer.
 func (t *TextView) Clear() *TextView {
+	t.Lock()
+	defer t.Unlock()
+
+	t.clear()
+	return t
+}
+
+// clear is the internal implementaton of clear. It is used by TextViewWriter
+// and anywhere that we need to perform a write without locking the buffer.
+func (t *TextView) clear() {
 	t.buffer = nil
 	t.recentBytes = nil
 	t.index = nil
-	return t
 }
 
 // Highlight specifies which regions should be highlighted. If highlight
@@ -589,7 +662,7 @@ func (t *TextView) Focus(delegate func(p Primitive)) {
 	// Implemented here with locking because this is used by layout primitives.
 	t.Lock()
 	defer t.Unlock()
-	t.hasFocus = true
+	t.Box.Focus(delegate)
 }
 
 // HasFocus returns whether or not this primitive has focus.
@@ -598,17 +671,24 @@ func (t *TextView) HasFocus() bool {
 	// callback.
 	t.Lock()
 	defer t.Unlock()
-	return t.hasFocus
+	return t.Box.HasFocus()
 }
 
 // Write lets us implement the io.Writer interface. Tab characters will be
 // replaced with TabSize space characters. A "\n" or "\r\n" will be interpreted
 // as a new line.
 func (t *TextView) Write(p []byte) (n int, err error) {
-	// Notify at the end.
 	t.Lock()
+	defer t.Unlock()
+
+	return t.write(p)
+}
+
+// write is the internal implementation of Write. It is used by TextViewWriter
+// and anywhere that we need to perform a write without locking the buffer.
+func (t *TextView) write(p []byte) (n int, err error) {
+	// Notify at the end.
 	changed := t.changed
-	t.Unlock()
 	if changed != nil {
 		defer func() {
 			// We always call the "changed" function in a separate goroutine to avoid
@@ -616,9 +696,6 @@ func (t *TextView) Write(p []byte) (n int, err error) {
 			go changed()
 		}()
 	}
-
-	t.Lock()
-	defer t.Unlock()
 
 	// Copy data over.
 	newBytes := append(t.recentBytes, p...)
@@ -668,10 +745,37 @@ func (t *TextView) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+// BatchWriter returns a new writer that can be used to write into the buffer
+// but without Locking/Unlocking the buffer on every write, as TextView's
+// Write() and Clear() functions do. The lock will be aquired once when
+// BatchWriter is called, and will be released when the returned writer is
+// closed. Example:
+//
+//   tv := tview.NewTextView()
+//   w := tv.BatchWriter()
+//   defer w.Close()
+//   w.Clear()
+//   fmt.Fprintln(w, "To sit in solemn silence")
+//   fmt.Fprintln(w, "on a dull, dark, dock")
+//   fmt.Println(tv.GetText(false))
+//
+// Note that using the batch writer requires you to manage any issues that may
+// arise from concurrency yourself. See package description for details on
+// dealing with concurrency.
+func (t *TextView) BatchWriter() TextViewWriter {
+	t.Lock()
+	return TextViewWriter{
+		t: t,
+	}
+}
+
 // reindexBuffer re-indexes the buffer such that we can use it to easily draw
 // the buffer onto the screen. Each line in the index will contain a pointer
 // into the buffer from which on we will print text. It will also contain the
-// color with which the line starts.
+// colors, attributes, and region with which the line starts.
+//
+// If maxLines is greater than 0, any extra lines will be dropped from the
+// buffer.
 func (t *TextView) reindexBuffer(width int) {
 	if t.index != nil {
 		return // Nothing has changed. We can still use the current index.
@@ -834,6 +938,56 @@ func (t *TextView) reindexBuffer(width int) {
 		}
 	}
 
+	// Drop lines beyond maxLines.
+	if t.maxLines > 0 && len(t.index) > t.maxLines {
+		removedLines := len(t.index) - t.maxLines
+
+		// Adjust the index.
+		t.index = t.index[removedLines:]
+		if t.fromHighlight >= 0 {
+			t.fromHighlight -= removedLines
+			if t.fromHighlight < 0 {
+				t.fromHighlight = 0
+			}
+		}
+		if t.toHighlight >= 0 {
+			t.toHighlight -= removedLines
+			if t.toHighlight < 0 {
+				t.fromHighlight, t.toHighlight, t.posHighlight = -1, -1, -1
+			}
+		}
+		bufferShift := t.index[0].Line
+		for _, line := range t.index {
+			line.Line -= bufferShift
+		}
+
+		// Adjust the original buffer.
+		t.buffer = t.buffer[bufferShift:]
+		var prefix string
+		if t.index[0].ForegroundColor != "" || t.index[0].BackgroundColor != "" || t.index[0].Attributes != "" {
+			prefix = fmt.Sprintf("[%s:%s:%s]", t.index[0].ForegroundColor, t.index[0].BackgroundColor, t.index[0].Attributes)
+		}
+		if t.index[0].Region != "" {
+			prefix += fmt.Sprintf(`["%s"]`, t.index[0].Region)
+		}
+		posShift := t.index[0].Pos
+		t.buffer[0] = prefix + t.buffer[0][posShift:]
+		t.lineOffset -= removedLines
+		if t.lineOffset < 0 {
+			t.lineOffset = 0
+		}
+
+		// Adjust positions of first buffer line.
+		posShift -= len(prefix)
+		for _, line := range t.index {
+			if line.Line != 0 {
+				break
+			}
+			line.Pos -= posShift
+			line.NextPos -= posShift
+		}
+	}
+
 	// Calculate longest line.
 	t.longestLine = 0
 	for _, line := range t.index {
@@ -935,7 +1089,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	}
 
 	// Draw the buffer.
-	defaultStyle := tcell.StyleDefault.Foreground(t.textColor)
+	defaultStyle := tcell.StyleDefault.Foreground(t.textColor).Background(t.backgroundColor)
 	for line := t.lineOffset; line < len(t.index); line++ {
 		// Are we done?
 		if line-t.lineOffset >= height || y+line-t.lineOffset >= totalHeight {
@@ -949,14 +1103,22 @@ func (t *TextView) Draw(screen tcell.Screen) {
 		backgroundColor := index.BackgroundColor
 		attributes := index.Attributes
 		regionID := index.Region
-		if t.regions && regionID != "" && (len(t.regionInfos) == 0 || t.regionInfos[len(t.regionInfos)-1].ID != regionID) {
-			t.regionInfos = append(t.regionInfos, &textViewRegion{
-				ID:    regionID,
-				FromX: x,
-				FromY: y + line - t.lineOffset,
-				ToX:   -1,
-				ToY:   -1,
-			})
+		if t.regions {
+			if len(t.regionInfos) > 0 && t.regionInfos[len(t.regionInfos)-1].ID != regionID {
+				// End last region.
+				t.regionInfos[len(t.regionInfos)-1].ToX = x
+				t.regionInfos[len(t.regionInfos)-1].ToY = y + line - t.lineOffset
+			}
+			if regionID != "" && (len(t.regionInfos) == 0 || t.regionInfos[len(t.regionInfos)-1].ID != regionID) {
+				// Start a new region.
+				t.regionInfos = append(t.regionInfos, &textViewRegion{
+					ID:    regionID,
+					FromX: x,
+					FromY: y + line - t.lineOffset,
+					ToX:   -1,
+					ToY:   -1,
+				})
+			}
 		}
 
 		// Process tags.
@@ -1019,9 +1181,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 				}
 
 				// Mix the existing style with the new style.
-				_, _, existingStyle, _ := screen.GetContent(x+posX, y+line-t.lineOffset)
-				_, background, _ := existingStyle.Decompose()
-				style := overlayStyle(background, defaultStyle, foregroundColor, backgroundColor, attributes)
+				style := overlayStyle(defaultStyle, foregroundColor, backgroundColor, attributes)
 
 				// Do we highlight this character?
 				var highlighted bool
@@ -1032,7 +1192,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 				}
 				if highlighted {
 					fg, bg, _ := style.Decompose()
-					if bg == tcell.ColorDefault {
+					if bg == t.backgroundColor {
 						r, g, b := fg.RGB()
 						c := colorful.Color{R: float64(r) / 255, G: float64(g) / 255, B: float64(b) / 255}
 						_, _, li := c.Hcl()

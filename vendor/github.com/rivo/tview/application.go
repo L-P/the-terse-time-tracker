@@ -44,8 +44,8 @@ const (
 )
 
 // queuedUpdate represented the execution of f queued by
-// Application.QueueUpdate(). The "done" channel receives exactly one element
-// after f has executed.
+// Application.QueueUpdate(). If "done" is not nil, it receives exactly one
+// element after f has executed.
 type queuedUpdate struct {
 	f    func()
 	done chan struct{}
@@ -193,7 +193,7 @@ func (a *Application) SetScreen(screen tcell.Screen) *Application {
 	return a
 }
 
-// EnableMouse enables mouse events.
+// EnableMouse enables mouse events or disables them (if "false" is provided).
 func (a *Application) EnableMouse(enable bool) *Application {
 	a.Lock()
 	defer a.Unlock()
@@ -212,7 +212,7 @@ func (a *Application) EnableMouse(enable bool) *Application {
 // when Stop() was called.
 func (a *Application) Run() error {
 	var (
-		err         error
+		err, appErr error
 		lastRedraw  time.Time   // The time the screen was last redrawn.
 		redrawTimer *time.Timer // A timer to schedule the next redraw.
 	)
@@ -282,11 +282,15 @@ func (a *Application) Run() error {
 			// We have a new screen. Keep going.
 			a.Lock()
 			a.screen = screen
+			enableMouse := a.enableMouse
 			a.Unlock()
 
 			// Initialize and draw this screen.
 			if err := screen.Init(); err != nil {
 				panic(err)
+			}
+			if enableMouse {
+				screen.EnableMouse()
 			}
 			a.draw()
 		}
@@ -322,6 +326,7 @@ EventLoop:
 				// Ctrl-C closes the application.
 				if event.Key() == tcell.KeyCtrlC {
 					a.Stop()
+					break
 				}
 
 				// Pass other key events to the root primitive.
@@ -365,12 +370,17 @@ EventLoop:
 				if isMouseDownAction {
 					a.mouseDownX, a.mouseDownY = event.Position()
 				}
+			case *tcell.EventError:
+				appErr = event
+				a.Stop()
 			}
 
 		// If we have updates, now is the time to execute them.
 		case update := <-a.updates:
 			update.f()
-			update.done <- struct{}{}
+			if update.done != nil {
+				update.done <- struct{}{}
+			}
 		}
 	}
 
@@ -378,7 +388,7 @@ EventLoop:
 	wg.Wait()
 	a.screen = nil
 
-	return nil
+	return appErr
 }
 
 // fireMouseActions analyzes the provided mouse event, derives mouse actions
@@ -442,9 +452,9 @@ func (a *Application) fireMouseActions(event *tcell.EventMouse) (consumed, isMou
 		button                  tcell.ButtonMask
 		down, up, click, dclick MouseAction
 	}{
-		{tcell.Button1, MouseLeftDown, MouseLeftUp, MouseLeftClick, MouseLeftDoubleClick},
-		{tcell.Button2, MouseMiddleDown, MouseMiddleUp, MouseMiddleClick, MouseMiddleDoubleClick},
-		{tcell.Button3, MouseRightDown, MouseRightUp, MouseRightClick, MouseRightDoubleClick},
+		{tcell.ButtonPrimary, MouseLeftDown, MouseLeftUp, MouseLeftClick, MouseLeftDoubleClick},
+		{tcell.ButtonMiddle, MouseMiddleDown, MouseMiddleUp, MouseMiddleClick, MouseMiddleDoubleClick},
+		{tcell.ButtonSecondary, MouseRightDown, MouseRightUp, MouseRightClick, MouseRightDoubleClick},
 	} {
 		if buttonChanges&buttonEvent.button != 0 {
 			if buttons&buttonEvent.button != 0 {
@@ -509,19 +519,27 @@ func (a *Application) Suspend(f func()) bool {
 	}
 
 	// Enter suspended mode.
-	screen.Fini()
+	if err := screen.Suspend(); err != nil {
+		return false // Suspension failed.
+	}
 
 	// Wait for "f" to return.
 	f()
 
-	// Make a new screen.
-	var err error
-	screen, err = tcell.NewScreen()
-	if err != nil {
-		panic(err)
+	// If the screen object has changed in the meantime, we need to do more.
+	a.RLock()
+	defer a.RUnlock()
+	if a.screen != screen {
+		// Calling Stop() while in suspend mode currently still leads to a
+		// panic, see https://github.com/gdamore/tcell/issues/440.
+		screen.Fini()
+		if a.screen == nil {
+			return true // If stop was called (a.screen is nil), we're done already.
+		}
+	} else {
+		// It hasn't changed. Resume.
+		screen.Resume() // Not much we can do in case of an error.
 	}
-	a.screenReplacement <- screen
-	// One key event will get lost, see https://github.com/gdamore/tcell/issues/194
 
 	// Continue application loop.
 	return true
@@ -529,7 +547,9 @@ func (a *Application) Suspend(f func()) bool {
 
 // Draw refreshes the screen (during the next update cycle). It calls the Draw()
 // function of the application's root primitive and then syncs the screen
-// buffer. It is almost never necessary to call this function. Please see
+// buffer. It is almost never necessary to call this function. It can actually
+// deadlock your application if you call it from the main thread (e.g. in a
+// callback function of a widget). Please see
 // https://github.com/rivo/tview/wiki/Concurrency for details.
 func (a *Application) Draw() *Application {
 	a.QueueUpdate(func() {
@@ -590,6 +610,23 @@ func (a *Application) draw() *Application {
 	// Sync screen.
 	screen.Show()
 
+	return a
+}
+
+// Sync forces a full re-sync of the screen buffer with the actual screen during
+// the next event cycle. This is useful for when the terminal screen is
+// corrupted so you may want to offer your users a keyboard shortcut to refresh
+// the screen.
+func (a *Application) Sync() *Application {
+	a.updates <- queuedUpdate{f: func() {
+		a.RLock()
+		screen := a.screen
+		a.RUnlock()
+		if screen == nil {
+			return
+		}
+		screen.Sync()
+	}}
 	return a
 }
 

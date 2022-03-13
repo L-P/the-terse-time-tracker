@@ -1,6 +1,6 @@
 # Rich Interactive Widgets for Terminal UIs
 
-[![Godoc Reference](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/rivo/tview)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/rivo/tview)](https://pkg.go.dev/github.com/rivo/tview)
 [![Go Report](https://img.shields.io/badge/go%20report-A%2B-brightgreen.svg)](https://goreportcard.com/report/github.com/rivo/tview)
 
 This Go package provides commonly needed components for terminal based user interfaces.
@@ -71,7 +71,6 @@ For a presentation highlighting this package, compile and run the program found 
 - [A growing collection of convenient little tools to work with systemd services](https://github.com/muesli/service-tools/)
 - [A terminal based browser for Redis written in Go](https://github.com/nitishm/redis-terminal)
 - [First project for the Computer Networks course.](https://github.com/pablogadhi/XMPPClient)
-- [CLI tool build in Golang for managing ssh connection](https://github.com/patilsuraj767/connection-master)
 - [Test your typing speed in the terminal!](https://github.com/shilangyu/typer-go)
 - [TUI Client for Docker](https://github.com/skanehira/docui)
 - [SSH client using certificates signed by HashiCorp Vault](https://github.com/stephane-martin/vssh)
@@ -86,6 +85,26 @@ For a presentation highlighting this package, compile and run the program found 
 - [Discord, TUI and SIXEL.](https://gitlab.com/diamondburned/6cord)
 - [A CLI Audio Player](https://www.github.com/dhulihan/grump)
 - [GLab, a GitLab CLI tool](https://gitlab.com/profclems/glab)
+- [Browse your AWS ECS Clusters in the Terminal](https://github.com/swartzrock/ecsview)
+- [The CLI Task Manager for Geeks](https://github.com/ajaxray/geek-life)
+- [Fast disk usage analyzer written in Go](https://github.com/dundee/gdu)
+- [Multiplayer Chess On Terminal](https://github.com/qnkhuat/gochess)
+- [Scriptable TUI music player](https://github.com/issadarkthing/gomu)
+- [MangaDesk : TUI Client for downloading manga to your computer](https://github.com/darylhjd/mangadesk)
+- [Go How Much? a Crypto coin price tracking from terminal](https://github.com/ledongthuc/gohowmuch)
+- [dbui: Universal CLI for Database Connections](https://github.com/KenanBek/dbui)
+- [ssmbrowse: Simple and elegant cli AWS SSM parameter browser](https://github.com/bnaydenov/ssmbrowse)
+- [gobit: binance intelligence terminal](https://github.com/infl00p/gobit)
+- [viddy: A modern watch command](https://github.com/sachaos/viddy)
+- [s3surfer: CLI tool for browsing S3 bucket and download objects interactively](https://github.com/hirose31/s3surfer)
+- [libgen-tui: A terminal UI for downloading books from Library Genesis](https://github.com/audstanley/libgen-tui)
+- [kubectl-lazy: kubectl plugin to easy to view pod](https://github.com/togettoyou/kubectl-lazy)
+- [podman-tui: podman user interface](https://github.com/containers/podman-tui)
+- [tvxwidgets: tview extra widgets](https://github.com/navidys/tvxwidgets)
+- [Domino card game on terminal](https://github.com/gusti-andika/card-domino.git)
+- [goaround: Query stackoverflow API and get results on terminal](https://github.com/glendsoza/goaround)
+- [resto: 🔗 a CLI app can send pretty HTTP & API requests with TUI](https://github.com/abdfnx/resto)
+- [twad: a WAD launcher for the terminal](https://github.com/zmnpl/twad)
 
 ## Documentation
 
@@ -106,3 +125,7 @@ I try really hard to keep this project backwards compatible. Your software shoul
 ## Your Feedback
 
 Add your issue here on GitHub. Feel free to get in touch if you have any questions.
+
+## Code of Conduct
+
+We follow Golang's Code of Conduct which you can find [here](https://golang.org/conduct).

@@ -29,7 +29,7 @@ type DropDown struct {
 	// currently selected.
 	currentOption int
 
-	// Strings to be placed beefore and after the current option.
+	// Strings to be placed before and after the current option.
 	currentOptionPrefix, currentOptionSuffix string
 
 	// The text to be displayed when no option has yet been selected.
@@ -200,6 +200,17 @@ func (d *DropDown) SetPrefixTextColor(color tcell.Color) *DropDown {
 	return d
 }
 
+// SetListStyles sets the styles of the items in the drop-down list (unselected
+// as well as selected items). Style attributes are currently ignored but may be
+// used in the future.
+func (d *DropDown) SetListStyles(unselected, selected tcell.Style) *DropDown {
+	fg, bg, _ := unselected.Decompose()
+	d.list.SetMainTextColor(fg).SetBackgroundColor(bg)
+	fg, bg, _ = selected.Decompose()
+	d.list.SetSelectedTextColor(fg).SetSelectedBackgroundColor(bg)
+	return d
+}
+
 // SetFormAttributes sets attributes shared by all form items.
 func (d *DropDown) SetFormAttributes(labelWidth int, labelColor, bgColor, fieldTextColor, fieldBgColor tcell.Color) FormItem {
 	d.labelWidth = labelWidth
@@ -253,6 +264,19 @@ func (d *DropDown) SetOptions(texts []string, selected func(text string, index i
 		}(text, index)
 	}
 	d.selected = selected
+	return d
+}
+
+// GetOptionCount returns the number of options in the drop-down.
+func (d *DropDown) GetOptionCount() int {
+	return len(d.options)
+}
+
+// RemoveOption removes the specified option from the drop-down. Panics if the
+// index is out of range.
+func (d *DropDown) RemoveOption(index int) *DropDown {
+	d.options = append(d.options[:index], d.options[index+1:]...)
+	d.list.RemoveItem(index)
 	return d
 }
 
@@ -496,9 +520,10 @@ func (d *DropDown) closeList(setFocus func(Primitive)) {
 
 // Focus is called by the application when the primitive receives focus.
 func (d *DropDown) Focus(delegate func(p Primitive)) {
-	d.Box.Focus(delegate)
 	if d.open {
 		delegate(d.list)
+	} else {
+		d.Box.Focus(delegate)
 	}
 }
 
@@ -507,7 +532,7 @@ func (d *DropDown) HasFocus() bool {
 	if d.open {
 		return d.list.HasFocus()
 	}
-	return d.hasFocus
+	return d.Box.HasFocus()
 }
 
 // MouseHandler returns the mouse handler for this primitive.
@@ -515,8 +540,8 @@ func (d *DropDown) MouseHandler() func(action MouseAction, event *tcell.EventMou
 	return d.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
 		// Was the mouse event in the drop-down box itself (or on its label)?
 		x, y := event.Position()
-		_, rectY, _, _ := d.GetInnerRect()
-		inRect := y == rectY
+		rectX, rectY, rectWidth, _ := d.GetInnerRect()
+		inRect := y == rectY && x >= rectX && x < rectX+rectWidth
 		if !d.open && !inRect {
 			return d.InRect(x, y), nil // No, and it's not expanded either. Ignore.
 		}

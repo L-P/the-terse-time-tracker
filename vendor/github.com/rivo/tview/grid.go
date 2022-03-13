@@ -60,17 +60,18 @@ type Grid struct {
 
 // NewGrid returns a new grid-based layout container with no initial primitives.
 //
-// Note that Box, the superclass of Grid, will have its background color set to
-// transparent so that any grid areas not covered by any primitives will leave
-// their background unchanged. To clear a Grid's background before any items are
-// drawn, set it to the desired color:
+// Note that Box, the superclass of Grid, will be transparent so that any grid
+// areas not covered by any primitives will leave their background unchanged. To
+// clear a Grid's background before any items are drawn, reset its Box to one
+// with the desired color:
 //
-//   grid.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+//   grid.Box = NewBox()
 func NewGrid() *Grid {
 	g := &Grid{
-		Box:          NewBox().SetBackgroundColor(tcell.ColorDefault),
 		bordersColor: Styles.GraphicsColor,
 	}
+	g.Box = NewBox()
+	g.Box.dontClear = true
 	return g
 }
 
@@ -92,7 +93,7 @@ func NewGrid() *Grid {
 // following call will result in columns with widths of 30, 10, 15, 15, and 30
 // cells:
 //
-//   grid.Setcolumns(30, 10, -1, -1, -2)
+//   grid.SetColumns(30, 10, -1, -1, -2)
 //
 // If a primitive were then placed in the 6th and 7th column, the resulting
 // widths would be: 30, 10, 10, 10, 20, 10, and 10 cells.
@@ -249,12 +250,7 @@ func (g *Grid) Focus(delegate func(p Primitive)) {
 			return
 		}
 	}
-	g.hasFocus = true
-}
-
-// Blur is called when this primitive loses focus.
-func (g *Grid) Blur() {
-	g.hasFocus = false
+	g.Box.Focus(delegate)
 }
 
 // HasFocus returns whether or not this primitive has focus.
@@ -264,7 +260,7 @@ func (g *Grid) HasFocus() bool {
 			return true
 		}
 	}
-	return g.hasFocus
+	return g.Box.HasFocus()
 }
 
 // InputHandler returns the handler for this primitive.
@@ -411,9 +407,6 @@ func (g *Grid) Draw(screen tcell.Screen) {
 			row = g.rows[index]
 		}
 		if row > 0 {
-			if row < g.minHeight {
-				row = g.minHeight
-			}
 			continue // Not proportional. We already know the width.
 		} else if row == 0 {
 			row = 1
@@ -434,9 +427,6 @@ func (g *Grid) Draw(screen tcell.Screen) {
 			column = g.columns[index]
 		}
 		if column > 0 {
-			if column < g.minWidth {
-				column = g.minWidth
-			}
 			continue // Not proportional. We already know the height.
 		} else if column == 0 {
 			column = 1
@@ -586,6 +576,7 @@ func (g *Grid) Draw(screen tcell.Screen) {
 	}
 
 	// Draw primitives and borders.
+	borderStyle := tcell.StyleDefault.Background(g.backgroundColor).Foreground(g.bordersColor)
 	for primitive, item := range items {
 		// Final primitive position.
 		if !item.visible {
@@ -634,11 +625,11 @@ func (g *Grid) Draw(screen tcell.Screen) {
 				}
 				by := item.y - 1
 				if by >= 0 && by < screenHeight {
-					PrintJoinedSemigraphics(screen, bx, by, Borders.Horizontal, g.bordersColor)
+					PrintJoinedSemigraphics(screen, bx, by, Borders.Horizontal, borderStyle)
 				}
 				by = item.y + item.h
 				if by >= 0 && by < screenHeight {
-					PrintJoinedSemigraphics(screen, bx, by, Borders.Horizontal, g.bordersColor)
+					PrintJoinedSemigraphics(screen, bx, by, Borders.Horizontal, borderStyle)
 				}
 			}
 			for by := item.y; by < item.y+item.h; by++ { // Left/right lines.
@@ -647,28 +638,28 @@ func (g *Grid) Draw(screen tcell.Screen) {
 				}
 				bx := item.x - 1
 				if bx >= 0 && bx < screenWidth {
-					PrintJoinedSemigraphics(screen, bx, by, Borders.Vertical, g.bordersColor)
+					PrintJoinedSemigraphics(screen, bx, by, Borders.Vertical, borderStyle)
 				}
 				bx = item.x + item.w
 				if bx >= 0 && bx < screenWidth {
-					PrintJoinedSemigraphics(screen, bx, by, Borders.Vertical, g.bordersColor)
+					PrintJoinedSemigraphics(screen, bx, by, Borders.Vertical, borderStyle)
 				}
 			}
 			bx, by := item.x-1, item.y-1 // Top-left corner.
 			if bx >= 0 && bx < screenWidth && by >= 0 && by < screenHeight {
-				PrintJoinedSemigraphics(screen, bx, by, Borders.TopLeft, g.bordersColor)
+				PrintJoinedSemigraphics(screen, bx, by, Borders.TopLeft, borderStyle)
 			}
 			bx, by = item.x+item.w, item.y-1 // Top-right corner.
 			if bx >= 0 && bx < screenWidth && by >= 0 && by < screenHeight {
-				PrintJoinedSemigraphics(screen, bx, by, Borders.TopRight, g.bordersColor)
+				PrintJoinedSemigraphics(screen, bx, by, Borders.TopRight, borderStyle)
 			}
 			bx, by = item.x-1, item.y+item.h // Bottom-left corner.
 			if bx >= 0 && bx < screenWidth && by >= 0 && by < screenHeight {
-				PrintJoinedSemigraphics(screen, bx, by, Borders.BottomLeft, g.bordersColor)
+				PrintJoinedSemigraphics(screen, bx, by, Borders.BottomLeft, borderStyle)
 			}
 			bx, by = item.x+item.w, item.y+item.h // Bottom-right corner.
 			if bx >= 0 && bx < screenWidth && by >= 0 && by < screenHeight {
-				PrintJoinedSemigraphics(screen, bx, by, Borders.BottomRight, g.bordersColor)
+				PrintJoinedSemigraphics(screen, bx, by, Borders.BottomRight, borderStyle)
 			}
 		}
 	}
