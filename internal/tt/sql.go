@@ -16,19 +16,19 @@ type transactionCallback func(*sql.Tx) error
 func (tt *TT) transaction(cb transactionCallback) error {
 	tx, err := tt.db.Begin()
 	if err != nil {
-		return ErrDatabase(err.Error())
+		return DatabaseError(err.Error())
 	}
 
 	if err := cb(tx); err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
-			return ErrDatabase(fmt.Sprintf("rollback error: %s\noriginal error: %s", err2, err))
+			return DatabaseError(fmt.Sprintf("rollback error: %s\noriginal error: %s", err2, err))
 		}
 
 		return err
 	}
 
 	if err := tx.Commit(); err != nil {
-		return ErrDatabase(err.Error())
+		return DatabaseError(err.Error())
 	}
 
 	return nil
@@ -36,7 +36,7 @@ func (tt *TT) transaction(cb transactionCallback) error {
 
 func exec(tx *sql.Tx, query string, params ...interface{}) error {
 	if _, err := tx.Exec(query, params...); err != nil {
-		return ErrBadQuery{err, query, params}
+		return BadQueryError{err, query, params}
 	}
 
 	return nil
@@ -45,9 +45,10 @@ func exec(tx *sql.Tx, query string, params ...interface{}) error {
 func execWithLastID(tx *sql.Tx, query string, params ...interface{}) (int64, error) {
 	res, err := tx.Exec(query, params...)
 	if err != nil {
-		return -1, ErrBadQuery{err, query, params}
+		return -1, BadQueryError{err, query, params}
 	}
 
+	// nolint: wrapcheck // nah, proxy func.
 	return res.LastInsertId()
 }
 

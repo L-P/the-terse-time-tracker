@@ -2,6 +2,7 @@ package tt
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -21,16 +22,16 @@ type TT struct {
 func New(dsn string) (*TT, error) {
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
-		return nil, ErrIO{"unable to open database", dsn, err}
+		return nil, IOError{"unable to open database", dsn, err}
 	}
 
 	if err := migrate(db); err != nil {
-		return nil, ErrIO{"unable to migrate DB", dsn, err}
+		return nil, IOError{"unable to migrate DB", dsn, err}
 	}
 
 	config, err := loadConfig(db)
 	if err != nil {
-		return nil, ErrRuntime(fmt.Sprintf("unable to load config: %s", err))
+		return nil, RuntimeError(fmt.Sprintf("unable to load config: %s", err))
 	}
 
 	return &TT{
@@ -40,20 +41,25 @@ func New(dsn string) (*TT, error) {
 }
 
 func (tt *TT) Close() error {
-	return tt.db.Close()
+	if err := tt.db.Close(); err != nil {
+		return fmt.Errorf("unable to close DB: %w", err)
+	}
+
+	return nil
 }
 
 // Start can start a new task and stop the current one, update a current task,
 // or do nothing.
 // It returns the current task (if any) and next task (always). If the task is
 // the same, the data might differ.
+// nolint:cyclop,gocognit // might be TODO
 func (tt *TT) Start(raw string) (*Task, *Task, error) {
 	desc, tags := ParseRawDesc(raw)
 	var current, next *Task
 
 	err := tt.transaction(func(tx *sql.Tx) (err error) {
 		current, err = getCurrentTask(tx)
-		if err != nil {
+		if err != nil && !errors.Is(err, ErrNoCurrentTask) {
 			return err
 		}
 
@@ -109,10 +115,6 @@ func (tt *TT) Stop() (*Task, error) {
 			return err
 		}
 
-		if cur == nil {
-			return ErrNoCurrentTask
-		}
-
 		cur.StoppedAt = time.Now()
 		if err := stopTask(tx, cur.ID); err != nil {
 			return err
@@ -163,20 +165,7 @@ func ParseRawDesc(raw string) (string, []string) {
 }
 
 func (tt *TT) GetTasks() ([]Task, error) {
-	var ret []Task
-
-	if err := tt.transaction(func(tx *sql.Tx) (err error) {
-		ret, err = getAllTasks(tx)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
+	return tt.wrapTaskQuery(getAllTasks)
 }
 
 func (tt *TT) DeleteTask(taskID int64) error {
@@ -194,11 +183,7 @@ func (tt *TT) CurrentTask() (*Task, error) {
 
 	if err := tt.transaction(func(tx *sql.Tx) (err error) {
 		cur, err = getCurrentTask(tx)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 	}); err != nil {
 		return nil, err
 	}
@@ -277,30 +262,11 @@ func (tt *TT) getAggregatedTime(tx *sql.Tx, start, end time.Time) (time.Duration
 	return acc, nil
 }
 
-func (tt *TT) getWorkedHoursBounds(tx *sql.Tx, t time.Time) (time.Time, time.Time, error) {
-	dayStart := util.GetStartOfDay(t)
-	dayEnd := dayStart.AddDate(0, 0, 1)
-
-	tasks, err := getTasksInRange(tx, dayStart, dayEnd)
+func (tt *TT) GetFirstTask() (Task, error) {
+	tasks, err := tt.wrapTaskQuery(getFirstTask)
 	if err != nil {
-		return time.Time{}, time.Time{}, err
+		return Task{}, err
 	}
 
-	if len(tasks) == 0 {
-		return time.Time{}, time.Time{}, ErrNoTasks
-	}
-
-	start := tasks[len(tasks)-1].StartedAt
-	end := tasks[0].StoppedAt
-
-	if start.Before(dayStart) {
-		start = dayStart
-	}
-	if end.After(dayEnd) {
-		end = dayEnd
-	} else if end.IsZero() {
-		end = time.Now()
-	}
-
-	return start, end, nil
+	return tasks[0], nil // wrapTaskQuery errors out if no task found we have at least one
 }
