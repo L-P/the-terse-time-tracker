@@ -15,8 +15,7 @@ import (
 )
 
 type TT struct {
-	db     *sql.DB
-	config Config
+	db *sql.DB
 }
 
 func New(dsn string) (*TT, error) {
@@ -29,15 +28,7 @@ func New(dsn string) (*TT, error) {
 		return nil, IOError{"unable to migrate DB", dsn, err}
 	}
 
-	config, err := loadConfig(db)
-	if err != nil {
-		return nil, RuntimeError(fmt.Sprintf("unable to load config: %s", err))
-	}
-
-	return &TT{
-		db:     db,
-		config: config,
-	}, nil
+	return &TT{db: db}, nil
 }
 
 func (tt *TT) Close() error {
@@ -191,24 +182,12 @@ func (tt *TT) CurrentTask() (*Task, error) {
 	return cur, nil
 }
 
-func (tt *TT) GetConfig() Config {
-	return tt.config
-}
-
-func (tt *TT) SetConfig(config Config) error {
-	if err := config.Validate(); err != nil {
-		return err
-	}
-
-	tt.config = config
-	return tt.transaction(tt.config.save)
-}
-
 func (tt *TT) GetDurationLeft() (time.Duration, time.Duration, error) {
 	var daily, weekly time.Duration
+	rules := staticRulesTimeline().forDay(time.Now())
 
 	if err := tt.transaction(func(tx *sql.Tx) (err error) {
-		if tt.config.WeeklyHours <= 0 {
+		if rules[ruleWeeklyHours] <= 0 {
 			return ErrNotConfigured
 		}
 
@@ -233,7 +212,8 @@ func (tt *TT) GetDurationLeft() (time.Duration, time.Duration, error) {
 		return 0, 0, err
 	}
 
-	return (tt.config.WeeklyHours / 5) - daily, tt.config.WeeklyHours - weekly, nil
+	weeklyWork := time.Hour * time.Duration((rules[ruleWeeklyHours]))
+	return (weeklyWork / 5) - daily, weeklyWork - weekly, nil
 }
 
 func (tt *TT) getAggregatedTime(tx *sql.Tx, start, end time.Time) (time.Duration, error) {
@@ -243,20 +223,8 @@ func (tt *TT) getAggregatedTime(tx *sql.Tx, start, end time.Time) (time.Duration
 	}
 
 	var acc time.Duration
-	for _, task := range tasks {
-		clampedStart := task.StartedAt
-		if clampedStart.Before(start) {
-			clampedStart = start
-		}
-
-		clampedEnd := task.StoppedAt
-		if clampedEnd.IsZero() {
-			clampedEnd = time.Now()
-		} else if clampedEnd.After(end) {
-			clampedEnd = end
-		}
-
-		acc += clampedEnd.Sub(clampedStart)
+	for _, task := range clampTasks(tasks, start, end) {
+		acc += task.StoppedAt.Sub(task.StartedAt)
 	}
 
 	return acc, nil

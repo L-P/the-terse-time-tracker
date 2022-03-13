@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 	"tt/internal/tt"
-	"unicode"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -48,8 +47,6 @@ type UI struct {
 	taskTable *tview.Table
 	taskForm  *tview.Form
 
-	configForm *tview.Form
-
 	tasks             []tt.Task
 	selectedTaskIndex int // index in tasks slice
 }
@@ -66,8 +63,6 @@ func New(tt *tt.TT) *UI {
 		taskFlex:  tview.NewFlex(),
 		taskTable: tview.NewTable(),
 		taskForm:  tview.NewForm(),
-
-		configForm: tview.NewForm(),
 	}
 
 	ui.init()
@@ -81,17 +76,14 @@ func (ui *UI) Run() error {
 }
 
 const (
-	pageTasks  = "tasks"
-	pageConfig = "config"
+	pageTasks = "tasks"
 )
 
 func (ui *UI) init() {
 	ui.initMainLayout()
 	ui.initTaskPageLayout()
-	ui.updateConfigForm(ui.tt.GetConfig())
 
 	ui.mainPages.AddPage(pageTasks, ui.taskFlex, true, true)
-	ui.mainPages.AddPage(pageConfig, ui.configForm, true, false)
 
 	ui.mainPages.SetInputCapture(ui.inputCapture)
 	ui.app.SetRoot(ui.mainFlex, true).SetFocus(ui.taskTable)
@@ -108,9 +100,6 @@ func (ui *UI) inputCapture(event *tcell.EventKey) *tcell.EventKey {
 	case tcell.KeyF1:
 		ui.setActivePage(pageTasks)
 		return nil
-	case tcell.KeyF2:
-		ui.setActivePage(pageConfig)
-		return nil
 	}
 
 	switch {
@@ -119,11 +108,6 @@ func (ui *UI) inputCapture(event *tcell.EventKey) *tcell.EventKey {
 	case ui.taskForm.HasFocus():
 		if event.Key() == tcell.KeyEscape {
 			ui.app.SetFocus(ui.taskTable)
-			return nil
-		}
-	case ui.configForm.HasFocus():
-		if event.Key() == tcell.KeyEscape {
-			ui.app.Stop()
 			return nil
 		}
 	}
@@ -168,52 +152,8 @@ func (ui *UI) initMainLayout() {
 
 	pages := []struct{ name, title, key string }{
 		{pageTasks, t("Tasks"), "F1"},
-		{pageConfig, t("Config"), "F2"},
 	}
 	for _, v := range pages {
 		fmt.Fprintf(ui.mainFooter, `%s ["%s"][darkcyan]%s[white][""]  `, v.key, v.name, v.title)
-	}
-}
-
-const ( // must match the AddInputField order below
-	configFormFieldIndexWeeklyHours = iota
-)
-
-func (ui *UI) updateConfigForm(config tt.Config) {
-	acceptDuration := func(str string, r rune) bool {
-		if unicode.IsNumber(r) {
-			return true
-		}
-
-		// Allow unit after numbers.
-		if r == 'h' || r == 'm' || r == 's' {
-			return len(str) >= 2 && unicode.IsNumber(rune(str[len(str)-2]))
-		}
-
-		return false
-	}
-
-	ui.configForm.
-		Clear(true).
-		AddInputField(t("Weekly hours"), config.WeeklyHours.String(), 12, acceptDuration, nil).
-		AddButton(t("Save"), ui.saveConfigForm)
-}
-
-func (ui *UI) saveConfigForm() {
-	duration := func(i int) time.Duration {
-		str := ui.configForm.GetFormItem(i).(*tview.InputField).GetText()
-		f, err := time.ParseDuration(str)
-		if err != nil {
-			return 0
-		}
-
-		return f
-	}
-
-	config := ui.tt.GetConfig()
-	config.WeeklyHours = duration(configFormFieldIndexWeeklyHours)
-
-	if err := ui.tt.SetConfig(config); err != nil {
-		ui.printError("error: unable to save config:  %s", err) // TODO proper error display
 	}
 }
