@@ -34,6 +34,7 @@ func dispatch(app *tt.TT, args []string, w io.Writer) error {
 	stopTask := fset.Bool("stop", false, t("stops the current task"))
 	loadFixtures := fset.Bool("fixture", false, t("clears the database and fills it with dev data"))
 	showReport := fset.Bool("report", false, t("weekly report"))
+	showTagReport := fset.Bool("tag-report", false, t("global tag report"))
 	jsonOutput := fset.Bool("json", false, t("outputs JSON"))
 
 	if err := fset.Parse(args); err != nil {
@@ -55,6 +56,8 @@ func dispatch(app *tt.TT, args []string, w io.Writer) error {
 		return app.Fixture()
 	case *showReport:
 		return report(app, out)
+	case *showTagReport:
+		return tagReport(app, out)
 	case *startTask:
 		fallthrough
 	default:

@@ -192,3 +192,19 @@ func clampTasks(tasks []Task, start, end time.Time) []Task {
 
 	return ret
 }
+
+func (tt *TT) GetTagReport() (map[string]time.Duration, error) {
+	ret := map[string]time.Duration{}
+	tasks, err := tt.GetTasks()
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch tasks: %w", err)
+	}
+
+	for _, task := range tasks {
+		for _, tag := range task.Tags {
+			ret[tag] += task.Duration()
+		}
+	}
+
+	return ret, nil
+}

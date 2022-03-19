@@ -152,3 +152,16 @@ func printWeeklyReport(out output, r tt.Report, total tt.ReportEntry) {
 
 	fmt.Fprint(out.w, b.String())
 }
+
+func tagReport(app *tt.TT, out output) error {
+	report, err := app.GetTagReport()
+	if err != nil {
+		return fmt.Errorf("unable to generate tag report: %w", err)
+	}
+
+	for tag, dur := range report {
+		fmt.Fprintf(out.w, "%s, %s\n", tag, dur)
+	}
+
+	return nil
+}
