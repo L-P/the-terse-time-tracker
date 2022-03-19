@@ -224,6 +224,10 @@ func (tt *TT) getAggregatedTime(tx *sql.Tx, start, end time.Time) (time.Duration
 
 	var acc time.Duration
 	for _, task := range clampTasks(tasks, start, end) {
+		if task.StoppedAt.IsZero() {
+			task.StoppedAt = time.Now()
+		}
+
 		acc += task.StoppedAt.Sub(task.StartedAt)
 	}
 
