@@ -48,9 +48,13 @@ func (timeline rulesTimeline) forDay(t time.Time) rulesSnapshot {
 
 // TODO in DB, configurable at runtime.
 func staticRulesTimeline() rulesTimeline {
+	end39 := time.Date(2022, 11, 14, 0, 0, 0, 0, time.Now().Location())
+
 	return rulesTimeline{
-		ruleEntry{rule: ruleWeeklyHours, value: 39},
 		ruleEntry{rule: ruleHolidayFactor, value: 2},
 		ruleEntry{rule: ruleOnCallFactor, value: 1.5},
+		ruleEntry{end: &end39, rule: ruleWeeklyHours, value: 39},
+
+		ruleEntry{start: end39, rule: ruleWeeklyHours, value: 35},
 	}
 }
