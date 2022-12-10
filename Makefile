@@ -2,7 +2,7 @@ VERSION=$(shell git describe --tags)
 BUILDFLAGS=-ldflags '-X main.Version=${VERSION}'
 EXEC=tt
 
-all: $(EXEC) tt.en.man
+all: $(EXEC)
 
 tt.en.man: man.en.md
 	VERSION="$(VERSION)" \
