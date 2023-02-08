@@ -32,6 +32,7 @@ func dispatch(app *tt.TT, args []string, w io.Writer) error {
 	showUI := fset.Bool("ui", false, t("displays the TUI"))
 	startTask := fset.Bool("start", false, t("starts a new task or updates the current one"))
 	stopTask := fset.Bool("stop", false, t("stops the current task"))
+	replaceTask := fset.Bool("replace", false, t("replaces the current task tags and description"))
 	loadFixtures := fset.Bool("fixture", false, t("clears the database and fills it with dev data"))
 	showReport := fset.Bool("report", false, t("weekly report"))
 	showTagReport := fset.Bool("tag-report", false, t("global tag report"))
@@ -58,6 +59,8 @@ func dispatch(app *tt.TT, args []string, w io.Writer) error {
 		return report(app, out)
 	case *showTagReport:
 		return tagReport(app, out)
+	case *replaceTask:
+		return replace(app, fset.Args(), out)
 	case *startTask:
 		fallthrough
 	default:
@@ -207,6 +210,24 @@ func start(app *tt.TT, args []string, out output) error {
 	}
 
 	return nil
+}
+
+func replace(app *tt.TT, args []string, out output) error {
+	if len(args) == 0 {
+		fmt.Fprint(out.w, "-replace needs arguments.\n")
+		return tt.ExitCodeError(1)
+	}
+
+	cur, err := app.CurrentTask()
+	if err != nil {
+		return err
+	}
+
+	desc, tags := tt.ParseRawDesc(strings.Join(args, " "))
+	cur.Description = desc
+	cur.Tags = tags
+
+	return app.UpdateTask(*cur)
 }
 
 func writeStoppedTaskMessage(out output, task tt.Task) {
